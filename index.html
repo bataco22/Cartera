@@ -155,97 +155,85 @@
 
   <template id="assetTemplate">
     <article class="asset card">
-      <div class="asset-top">
+      <button class="asset-summary" type="button" aria-expanded="false">
         <div class="coin-main">
           <div class="coin-avatar">₿</div>
-          <div>
-            <h3 class="coin-name">Bitcoin</h3>
+          <div class="coin-heading">
+            <div class="coin-title-line">
+              <h3 class="coin-name">Bitcoin</h3>
+              <span class="goal-dot hidden" title="Meta"></span>
+            </div>
             <div class="coin-meta"><span class="symbol">BTC</span> · <span class="amount-text">0 BTC</span></div>
           </div>
         </div>
-        <div class="goal-dot-wrap">
-          <span class="goal-dot hidden" title="Meta"></span>
-          <button class="menu-btn" aria-label="Opciones">•••</button>
+        <div class="summary-right">
+          <strong class="summary-price">—</strong>
+          <small class="summary-value">—</small>
+          <span class="chevron" aria-hidden="true">⌄</span>
         </div>
-      </div>
+      </button>
 
-      <div class="asset-grid">
-        <div>
-          <span>Precio actual</span>
-          <strong class="current-price">—</strong>
-          <small class="change24">—</small>
-        </div>
-        <div class="right">
-          <span>Valor</span>
-          <strong class="asset-value">—</strong>
-          <small class="asset-pnl">—</small>
-        </div>
-      </div>
-
-      <div class="avg-row">
-        <span>Precio promedio</span>
-        <strong class="avg-price">—</strong>
-      </div>
-
-      <div class="locations-row"></div>
-      <div class="goals-row"></div>
-
-      <div class="market-context">
-        <div class="market-context-head">
-          <strong>Contexto de mercado</strong>
-          <small class="market-context-updated">—</small>
-        </div>
-
-        <div class="market-context-grid">
+      <div class="asset-details hidden">
+        <div class="asset-grid">
           <div>
-            <span>Mín. 24 h</span>
-            <strong class="low24">—</strong>
-          </div>
-          <div>
-            <span>Máx. 24 h</span>
-            <strong class="high24">—</strong>
-          </div>
-          <div>
-            <span>Mín. 1 año</span>
-            <strong class="low1y">—</strong>
-          </div>
-          <div>
-            <span>Máx. 1 año</span>
-            <strong class="high1y">—</strong>
-          </div>
-        </div>
-
-        <div class="range-block">
-          <div class="range-labels">
-            <span class="range-low-label">—</span>
-            <span>Precio dentro del rango anual</span>
-            <span class="range-high-label">—</span>
-          </div>
-          <div class="range-track">
-            <div class="range-progress"></div>
-            <div class="range-marker" title="Precio actual"></div>
-          </div>
-          <div class="range-position">—</div>
-        </div>
-
-        <div class="ath-row">
-          <div>
-            <span>Máximo histórico (ATH)</span>
-            <strong class="ath-price">—</strong>
+            <span>Precio actual</span>
+            <strong class="current-price">—</strong>
+            <small class="change24">—</small>
           </div>
           <div class="right">
-            <span>Fecha ATH</span>
-            <strong class="ath-date">—</strong>
+            <span>Valor</span>
+            <strong class="asset-value">—</strong>
+            <small class="asset-pnl">—</small>
           </div>
         </div>
-        <div class="ath-distance">—</div>
-      </div>
 
-      <div class="asset-footer">
-        <span class="allocation">— del portafolio</span>
-        <div class="row-actions hidden">
-          <button class="edit-btn secondary small">Editar</button>
-          <button class="delete-btn danger small">Eliminar</button>
+        <div class="avg-row">
+          <span>Precio promedio</span>
+          <strong class="avg-price">—</strong>
+        </div>
+
+        <div class="locations-row"></div>
+        <div class="goals-row"></div>
+
+        <div class="market-context">
+          <div class="market-context-head">
+            <strong>Contexto de mercado</strong>
+            <small class="market-context-updated">—</small>
+          </div>
+
+          <div class="market-context-grid">
+            <div><span>Mín. 24 h</span><strong class="low24">—</strong></div>
+            <div><span>Máx. 24 h</span><strong class="high24">—</strong></div>
+            <div><span>Mín. 1 año</span><strong class="low1y">—</strong></div>
+            <div><span>Máx. 1 año</span><strong class="high1y">—</strong></div>
+          </div>
+
+          <div class="range-block">
+            <div class="range-labels">
+              <span class="range-low-label">—</span>
+              <span>Precio dentro del rango anual</span>
+              <span class="range-high-label">—</span>
+            </div>
+            <div class="range-track">
+              <div class="range-progress"></div>
+              <div class="range-marker" title="Precio actual"></div>
+            </div>
+            <div class="range-position">—</div>
+          </div>
+
+          <div class="ath-row">
+            <div><span>Máximo histórico (ATH)</span><strong class="ath-price">—</strong></div>
+            <div class="right"><span>Fecha ATH</span><strong class="ath-date">—</strong></div>
+          </div>
+          <div class="ath-distance">—</div>
+        </div>
+
+        <div class="asset-footer">
+          <span class="allocation">— del portafolio</span>
+          <div class="row-actions">
+            <button type="button" class="edit-btn secondary small">Editar</button>
+            <button type="button" class="delete-btn danger small">Eliminar</button>
+          </div>
         </div>
       </div>
     </article>

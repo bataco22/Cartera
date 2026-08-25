@@ -41,3 +41,15 @@ label{display:flex;flex-direction:column;gap:7px;font-weight:700;font-size:13px;
 .ath-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px;padding-top:10px;border-top:1px dashed var(--line)}
 .ath-row>div{display:flex;flex-direction:column;gap:3px}.ath-distance{margin-top:7px;text-align:center;font-size:11px;font-weight:700}
 @media(max-width:540px){.market-context-grid{grid-template-columns:1fr 1fr}}
+
+/* v1.3 · lista compacta desplegable */
+.asset{padding:0;overflow:hidden}
+.asset-summary{width:100%;border:0;background:transparent;color:inherit;padding:15px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;text-align:left}
+.asset-summary:active{background:#f9fafb}
+.coin-heading{min-width:0}.coin-title-line{display:flex;align-items:center;gap:8px}.coin-title-line h3{margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.summary-right{margin-left:auto;display:grid;grid-template-columns:auto 20px;grid-template-rows:auto auto;column-gap:10px;align-items:center;text-align:right;min-width:112px}
+.summary-price{grid-column:1;font-size:15px}.summary-value{grid-column:1;color:var(--muted);font-size:11px;margin-top:2px}.chevron{grid-column:2;grid-row:1 / span 2;font-size:22px;line-height:1;color:var(--muted);transition:transform .18s ease}.chevron.open{transform:rotate(180deg)}
+.asset-details{padding:0 16px 16px;border-top:1px solid var(--line)}
+.asset-details .asset-grid{margin-top:0;padding-top:14px}
+.asset-footer{gap:12px;align-items:center}.row-actions{display:flex;gap:8px;flex-shrink:0}
+@media(max-width:420px){.asset-summary{padding:13px 14px}.coin-avatar{width:38px;height:38px}.summary-right{min-width:102px}.asset-details{padding:0 14px 14px}.asset-footer{align-items:flex-end}.row-actions{gap:6px}}

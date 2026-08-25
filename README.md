@@ -18,3 +18,10 @@ Fuentes de datos:
 - CoinGecko /coins/{id}/market_chart?days=365 para el rango anual.
 
 Los datos dependen de disponibilidad y límites de la API pública.
+
+
+## v1.3
+- Lista de criptos compacta tipo acordeón.
+- Toca una cripto para desplegar todos sus detalles.
+- Botones Editar y Eliminar visibles dentro de la ficha desplegada.
+- Precio y valor siguen visibles aun con la ficha cerrada.
