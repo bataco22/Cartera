@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#111827" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Mi Portafolio" />
+  <title>Mi Portafolio Cripto</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">MI PORTAFOLIO CRIPTO</p>
+      <h1>Resumen</h1>
+    </div>
+    <div class="top-actions">
+      <button id="backupBtn" class="icon-btn" aria-label="Respaldo">⇩</button>
+      <button id="refreshBtn" class="icon-btn" aria-label="Actualizar precios">↻</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="hero card">
+      <div class="hero-row">
+        <div>
+          <p class="muted">Valor actual</p>
+          <div id="totalValue" class="big-money">$0.00</div>
+          <div id="lastUpdated" class="tiny">Sin actualizar</div>
+        </div>
+        <div class="currency-switch">
+          <button data-currency="mxn" class="currency active">MXN</button>
+          <button data-currency="usd" class="currency">USD</button>
+        </div>
+      </div>
+      <div class="metrics">
+        <div><span>Invertido</span><strong id="totalCost">$0.00</strong></div>
+        <div><span>Ganancia / pérdida</span><strong id="totalPnl">$0.00</strong></div>
+        <div><span>Rendimiento</span><strong id="totalPct">—</strong></div>
+      </div>
+    </section>
+
+    <section id="goalPanel" class="goal-panel hidden">
+      <div class="section-head tight">
+        <div>
+          <h2>Metas cercanas</h2>
+          <p class="muted">Activos a 15% o menos de un objetivo.</p>
+        </div>
+      </div>
+      <div id="goalList" class="goal-list"></div>
+    </section>
+
+    <section id="allocationPanel" class="allocation-panel hidden">
+      <div class="section-head tight">
+        <div>
+          <h2>Distribución</h2>
+          <p class="muted">Peso actual por activo.</p>
+        </div>
+      </div>
+      <div id="allocationList" class="allocation-list card"></div>
+    </section>
+
+    <section class="section-head">
+      <div>
+        <h2>Mis criptos</h2>
+        <p id="coinCount" class="muted">0 activos</p>
+      </div>
+      <button id="addBtn" class="primary">+ Agregar</button>
+    </section>
+
+    <section id="portfolioList" class="portfolio-list"></section>
+
+    <section id="emptyState" class="empty card">
+      <div class="empty-icon">₿</div>
+      <h3>Aún no has agregado criptos</h3>
+      <p>Agrega una moneda y después registra una o varias compras, ubicaciones y metas.</p>
+      <button id="emptyAddBtn" class="primary">Agregar primera cripto</button>
+    </section>
+  </main>
+
+  <dialog id="assetDialog">
+    <form id="assetForm" method="dialog" class="dialog-card">
+      <div class="dialog-head">
+        <div>
+          <p class="eyebrow">ACTIVO</p>
+          <h2 id="dialogTitle">Agregar cripto</h2>
+        </div>
+        <button type="button" id="closeDialog" class="icon-btn">×</button>
+      </div>
+
+      <input type="hidden" id="editIndex" value="" />
+
+      <label>
+        Cripto
+        <div class="search-wrap">
+          <input id="coinSearch" autocomplete="off" placeholder="Ej. Bitcoin, BTC, Chainlink..." required />
+          <div id="searchResults" class="search-results"></div>
+        </div>
+      </label>
+
+      <div id="selectedCoin" class="selected-coin hidden"></div>
+      <input type="hidden" id="coinId" />
+
+      <div class="subsection">
+        <div class="subsection-head">
+          <div>
+            <strong>Compras / posiciones</strong>
+            <small>Una misma cripto puede estar en varios lugares.</small>
+          </div>
+          <button type="button" id="addLotBtn" class="secondary small">+ Compra</button>
+        </div>
+        <div id="lotsEditor"></div>
+      </div>
+
+      <div class="subsection">
+        <div class="subsection-head">
+          <div>
+            <strong>Metas</strong>
+            <small>Puedes usar USD o MXN.</small>
+          </div>
+          <button type="button" id="addGoalBtn" class="secondary small">+ Meta</button>
+        </div>
+        <div id="goalsEditor"></div>
+      </div>
+
+      <div class="dialog-actions">
+        <button type="button" id="cancelBtn" class="secondary">Cancelar</button>
+        <button type="submit" class="primary">Guardar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="backupDialog">
+    <div class="dialog-card">
+      <div class="dialog-head">
+        <div>
+          <p class="eyebrow">DATOS</p>
+          <h2>Respaldo</h2>
+        </div>
+        <button type="button" id="closeBackup" class="icon-btn">×</button>
+      </div>
+      <p class="muted">Exporta tu portafolio a JSON o importa un respaldo anterior.</p>
+      <div class="backup-actions">
+        <button id="exportBtn" class="primary">Exportar JSON</button>
+        <label class="secondary file-label">
+          Importar JSON
+          <input id="importInput" type="file" accept="application/json" hidden />
+        </label>
+      </div>
+    </div>
+  </dialog>
+
+  <template id="assetTemplate">
+    <article class="asset card">
+      <div class="asset-top">
+        <div class="coin-main">
+          <div class="coin-avatar">₿</div>
+          <div>
+            <h3 class="coin-name">Bitcoin</h3>
+            <div class="coin-meta"><span class="symbol">BTC</span> · <span class="amount-text">0 BTC</span></div>
+          </div>
+        </div>
+        <div class="goal-dot-wrap">
+          <span class="goal-dot hidden" title="Meta"></span>
+          <button class="menu-btn" aria-label="Opciones">•••</button>
+        </div>
+      </div>
+
+      <div class="asset-grid">
+        <div>
+          <span>Precio actual</span>
+          <strong class="current-price">—</strong>
+          <small class="change24">—</small>
+        </div>
+        <div class="right">
+          <span>Valor</span>
+          <strong class="asset-value">—</strong>
+          <small class="asset-pnl">—</small>
+        </div>
+      </div>
+
+      <div class="avg-row">
+        <span>Precio promedio</span>
+        <strong class="avg-price">—</strong>
+      </div>
+
+      <div class="locations-row"></div>
+      <div class="goals-row"></div>
+
+      <div class="market-context">
+        <div class="market-context-head">
+          <strong>Contexto de mercado</strong>
+          <small class="market-context-updated">—</small>
+        </div>
+
+        <div class="market-context-grid">
+          <div>
+            <span>Mín. 24 h</span>
+            <strong class="low24">—</strong>
+          </div>
+          <div>
+            <span>Máx. 24 h</span>
+            <strong class="high24">—</strong>
+          </div>
+          <div>
+            <span>Mín. 1 año</span>
+            <strong class="low1y">—</strong>
+          </div>
+          <div>
+            <span>Máx. 1 año</span>
+            <strong class="high1y">—</strong>
+          </div>
+        </div>
+
+        <div class="range-block">
+          <div class="range-labels">
+            <span class="range-low-label">—</span>
+            <span>Precio dentro del rango anual</span>
+            <span class="range-high-label">—</span>
+          </div>
+          <div class="range-track">
+            <div class="range-progress"></div>
+            <div class="range-marker" title="Precio actual"></div>
+          </div>
+          <div class="range-position">—</div>
+        </div>
+
+        <div class="ath-row">
+          <div>
+            <span>Máximo histórico (ATH)</span>
+            <strong class="ath-price">—</strong>
+          </div>
+          <div class="right">
+            <span>Fecha ATH</span>
+            <strong class="ath-date">—</strong>
+          </div>
+        </div>
+        <div class="ath-distance">—</div>
+      </div>
+
+      <div class="asset-footer">
+        <span class="allocation">— del portafolio</span>
+        <div class="row-actions hidden">
+          <button class="edit-btn secondary small">Editar</button>
+          <button class="delete-btn danger small">Eliminar</button>
+        </div>
+      </div>
+    </article>
+  </template>
+
+  <script src="app.js"></script>
+</body>
+</html>
