@@ -163,14 +163,19 @@
         <label>Moneda<select id="lotEditCurrency"><option value="usd">USD</option><option value="mxn">MXN</option></select></label>
       </div>
       <label>Exchange / Wallet<input id="lotEditLocation" placeholder="Binance, Bitso, Ledger..."></label>
+      <div class="grid3">
+        <label>Intención<select id="lotEditPurpose"><option value="long">Largo plazo</option><option value="recovery">Recuperación</option><option value="opportunity">Nueva oportunidad</option></select></label>
+        <label>Objetivo salida<input id="lotEditTarget" type="number" step="any" min="0" placeholder="Opcional"></label>
+        <label>Moneda objetivo<select id="lotEditTargetCurrency"><option value="usd">USD</option><option value="mxn">MXN</option></select></label>
+      </div>
       <div class="dialog-actions"><button type="button" id="cancelLotBtn" class="secondary">Cancelar</button><button type="submit" class="primary">Guardar compra</button></div>
     </form>
   </dialog>
 
   <dialog id="avgDialog">
     <div class="dialog-card">
-      <div class="dialog-head"><div><p class="eyebrow">SIMULADOR</p><h2 id="avgDialogTitle">Bajar promedio</h2></div><button type="button" id="closeAvgDialog" class="icon-btn">×</button></div>
-      <p class="muted avg-help">Prueba cuánto cambia tu precio promedio si compras más al precio actual. Es un cálculo matemático, no una recomendación de compra.</p>
+      <div class="dialog-head"><div><p class="eyebrow">SIMULADOR</p><h2 id="avgDialogTitle">Capital nuevo</h2></div><button type="button" id="closeAvgDialog" class="icon-btn">×</button></div>
+      <p class="muted avg-help">Compara qué pasa si usas capital nuevo para promediar, abrir un lote independiente de la misma cripto o evaluar otra oportunidad. Son cálculos, no recomendaciones de compra.</p>
       <input type="hidden" id="avgAssetIndex">
       <div class="avg-current-grid">
         <div><span>Precio actual</span><strong id="avgCurrentPrice">—</strong></div>
@@ -205,6 +210,27 @@
           <button id="avgCalcTarget" type="button" class="secondary">Calcular</button>
         </div>
         <div id="avgTargetResult" class="avg-target-result hidden"></div>
+      </div>
+
+      <div class="subsection compare-capital-box">
+        <div class="subsection-head"><div><strong>¿Dónde poner el capital nuevo?</strong><small>Compara la misma cantidad sin obligarte a rescatar la posición vieja.</small></div></div>
+        <label>Capital a comparar<input id="compareCapital" type="number" step="any" min="0" placeholder="Ej. 20000"></label>
+        <div class="compare-grid">
+          <div class="compare-input-card">
+            <strong id="sameAssetLabel">Misma cripto</strong>
+            <small>Nueva compra al precio actual, con objetivo propio.</small>
+            <label>Objetivo de venta<input id="sameAssetTarget" type="number" step="any" min="0" placeholder="Precio objetivo"></label>
+          </div>
+          <div class="compare-input-card">
+            <strong>Otra oportunidad</strong>
+            <small>Entrada y objetivo manuales para otra cripto.</small>
+            <label>Cripto / símbolo<input id="otherAssetName" placeholder="Ej. FET"></label>
+            <div class="grid2"><label>Precio entrada<input id="otherEntry" type="number" step="any" min="0"></label><label>Objetivo venta<input id="otherTarget" type="number" step="any" min="0"></label></div>
+          </div>
+        </div>
+        <button id="compareCapitalBtn" type="button" class="primary wide">Comparar escenarios</button>
+        <small id="compareCurrencyLabel" class="muted"></small>
+        <div id="compareResults" class="compare-results hidden"></div>
       </div>
     </div>
   </dialog>
@@ -287,7 +313,7 @@
           <div class="ath-distance">—</div>
         </div>
 
-        <div class="simulator-row"><button type="button" class="avg-sim-btn primary">Simular bajar promedio</button></div>
+        <div class="simulator-row"><button type="button" class="avg-sim-btn primary">Simular capital nuevo</button></div>
 
         <div class="asset-footer">
           <span class="allocation">— del portafolio</span>

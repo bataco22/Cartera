@@ -52,3 +52,10 @@ Los datos dependen de disponibilidad y límites de la API pública.
 - Solo una ficha permanece abierta a la vez.
 - Editar y Eliminar permanecen dentro de la ficha desplegada.
 - Caché PWA renovada para evitar que iPhone siga mostrando una versión anterior.
+
+## v1.7 — Capital nuevo y objetivos por compra
+- Cada compra puede marcarse como Largo plazo, Recuperación o Nueva oportunidad.
+- Cada compra puede tener un objetivo de salida propio, sin obligar a cerrar todas las compras de una cripto juntas.
+- El simulador ahora compara: promediar la posición actual, abrir un lote independiente de la misma cripto y evaluar otra cripto con entrada/objetivo manuales.
+- Conserva el cálculo de cuánto capital se necesita para bajar a un promedio objetivo.
+- Todos los cálculos son informativos y no ejecutan operaciones.
