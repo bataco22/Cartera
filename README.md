@@ -1,3 +1,23 @@
+# Mi Portafolio Cripto v1.6
+
+Novedades:
+- Simulador para bajar precio promedio por activo.
+- Montos rápidos editables y persistentes por moneda (MXN/USD).
+- Monto personalizado para probar cualquier inversión.
+- Escenarios con nuevo promedio, reducción del promedio y subida necesaria para recuperar.
+- Calculadora inversa: cuánto invertir para alcanzar un promedio objetivo.
+- Conserva detalle por exchange/wallet y compras individuales de v1.5.
+
+# Mi Portafolio Cripto v1.5
+
+Novedades:
+- Cartera tipo acordeón por cripto.
+- Compras agrupadas por exchange/wallet.
+- Cada exchange/wallet se despliega para mostrar sus compras individuales.
+- Cada compra muestra cantidad, precio de compra, invertido, valor actual y ganancia/pérdida.
+- Editar y eliminar una compra individual sin afectar las demás.
+- Conserva metas, contexto de mercado, ATH, rango anual, distribución y respaldo JSON.
+
 # Mi Portafolio Cripto v1.2
 
 Incluye todo lo de v1.1 más contexto de mercado por cripto:
@@ -25,3 +45,10 @@ Los datos dependen de disponibilidad y límites de la API pública.
 - Toca una cripto para desplegar todos sus detalles.
 - Botones Editar y Eliminar visibles dentro de la ficha desplegada.
 - Precio y valor siguen visibles aun con la ficha cerrada.
+
+
+## v1.4
+- Cartera en acordeón real: cada cripto inicia cerrada y al tocarla despliega toda su información.
+- Solo una ficha permanece abierta a la vez.
+- Editar y Eliminar permanecen dentro de la ficha desplegada.
+- Caché PWA renovada para evitar que iPhone siga mostrando una versión anterior.

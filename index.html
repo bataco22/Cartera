@@ -153,6 +153,62 @@
     </div>
   </dialog>
 
+  <dialog id="lotDialog">
+    <form id="lotForm" method="dialog" class="dialog-card">
+      <div class="dialog-head"><div><p class="eyebrow">COMPRA</p><h2>Editar compra</h2></div><button type="button" id="closeLotDialog" class="icon-btn">×</button></div>
+      <input type="hidden" id="lotAssetIndex"><input type="hidden" id="lotIndex">
+      <div class="grid3">
+        <label>Cantidad<input id="lotEditAmount" type="number" step="any" min="0" required></label>
+        <label>Precio compra<input id="lotEditPrice" type="number" step="any" min="0" required></label>
+        <label>Moneda<select id="lotEditCurrency"><option value="usd">USD</option><option value="mxn">MXN</option></select></label>
+      </div>
+      <label>Exchange / Wallet<input id="lotEditLocation" placeholder="Binance, Bitso, Ledger..."></label>
+      <div class="dialog-actions"><button type="button" id="cancelLotBtn" class="secondary">Cancelar</button><button type="submit" class="primary">Guardar compra</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="avgDialog">
+    <div class="dialog-card">
+      <div class="dialog-head"><div><p class="eyebrow">SIMULADOR</p><h2 id="avgDialogTitle">Bajar promedio</h2></div><button type="button" id="closeAvgDialog" class="icon-btn">×</button></div>
+      <p class="muted avg-help">Prueba cuánto cambia tu precio promedio si compras más al precio actual. Es un cálculo matemático, no una recomendación de compra.</p>
+      <input type="hidden" id="avgAssetIndex">
+      <div class="avg-current-grid">
+        <div><span>Precio actual</span><strong id="avgCurrentPrice">—</strong></div>
+        <div><span>Promedio actual</span><strong id="avgCurrentAvg">—</strong></div>
+        <div><span>Invertido</span><strong id="avgCurrentCost">—</strong></div>
+        <div><span>Cantidad</span><strong id="avgCurrentAmount">—</strong></div>
+      </div>
+
+      <div class="subsection avg-presets">
+        <div class="subsection-head"><div><strong>Cantidades rápidas</strong><small>Edita estos montos; se guardan para futuras simulaciones.</small></div></div>
+        <div class="grid3">
+          <label>Monto 1<input id="avgPreset1" class="avg-preset" type="number" step="any" min="0"></label>
+          <label>Monto 2<input id="avgPreset2" class="avg-preset" type="number" step="any" min="0"></label>
+          <label>Monto 3<input id="avgPreset3" class="avg-preset" type="number" step="any" min="0"></label>
+        </div>
+        <small id="avgPresetCurrency" class="muted"></small>
+      </div>
+
+      <label>Monto personalizado
+        <input id="avgCustomAmount" type="number" step="any" min="0" placeholder="Ej. 30000">
+      </label>
+
+      <div class="avg-results-wrap">
+        <div class="positions-head"><strong>Escenarios</strong><small>Cuánto bajaría el promedio con cada monto.</small></div>
+        <div id="avgResults" class="avg-results"></div>
+      </div>
+
+      <div class="subsection target-average-box">
+        <div class="subsection-head"><div><strong>¿Cuánto necesito para llegar a un promedio?</strong><small>Escribe el promedio que te gustaría alcanzar.</small></div></div>
+        <div class="target-average-row">
+          <input id="avgTargetPrice" type="number" step="any" min="0" placeholder="Precio promedio objetivo">
+          <button id="avgCalcTarget" type="button" class="secondary">Calcular</button>
+        </div>
+        <div id="avgTargetResult" class="avg-target-result hidden"></div>
+      </div>
+    </div>
+  </dialog>
+
   <template id="assetTemplate">
     <article class="asset card">
       <button class="asset-summary" type="button" aria-expanded="false">
@@ -192,7 +248,10 @@
           <strong class="avg-price">—</strong>
         </div>
 
-        <div class="locations-row"></div>
+        <div class="positions-block">
+          <div class="positions-head"><strong>Compras por exchange / wallet</strong><small>Toca una ubicación para ver cada compra.</small></div>
+          <div class="locations-row"></div>
+        </div>
         <div class="goals-row"></div>
 
         <div class="market-context">
@@ -227,6 +286,8 @@
           </div>
           <div class="ath-distance">—</div>
         </div>
+
+        <div class="simulator-row"><button type="button" class="avg-sim-btn primary">Simular bajar promedio</button></div>
 
         <div class="asset-footer">
           <span class="allocation">— del portafolio</span>

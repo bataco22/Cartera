@@ -1,12 +1,12 @@
 
 const STORAGE_KEY="mi_portafolio_cripto_v1_1";
-const state={assets:[],prices:{},marketContext:{},displayCurrency:"mxn",selectedCoin:null,searchTimer:null};
+const state={assets:[],prices:{},marketContext:{},displayCurrency:"mxn",selectedCoin:null,searchTimer:null,avgPresets:{mxn:[5000,10000,20000],usd:[250,500,1000]}};
 const $=id=>document.getElementById(id); const num=v=>Number(v||0);
 const fmt=(n,c=state.displayCurrency)=>Number.isFinite(Number(n))?new Intl.NumberFormat("es-MX",{style:"currency",currency:c.toUpperCase(),maximumFractionDigits:Math.abs(Number(n))<10?4:2}).format(Number(n)):"—";
 const pctClass=v=>!Number.isFinite(v)||v===0?"":v>0?"positive":"negative"; const formatPct=v=>Number.isFinite(v)?`${v>=0?"+":""}${v.toFixed(2)}%`:"—";
 function escapeHtml(s){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
-function load(){try{const d=JSON.parse(localStorage.getItem(STORAGE_KEY)||"{}");state.assets=Array.isArray(d.assets)?d.assets:[];state.displayCurrency=d.displayCurrency||"mxn"}catch{state.assets=[]}}
-function save(){localStorage.setItem(STORAGE_KEY,JSON.stringify({assets:state.assets,displayCurrency:state.displayCurrency}))}
+function load(){try{const d=JSON.parse(localStorage.getItem(STORAGE_KEY)||"{}");state.assets=Array.isArray(d.assets)?d.assets:[];state.displayCurrency=d.displayCurrency||"mxn";if(d.avgPresets&&typeof d.avgPresets==="object")state.avgPresets={...state.avgPresets,...d.avgPresets}}catch{state.assets=[]}}
+function save(){localStorage.setItem(STORAGE_KEY,JSON.stringify({assets:state.assets,displayCurrency:state.displayCurrency,avgPresets:state.avgPresets}))}
 function getPrice(a,c=state.displayCurrency){return state.prices?.[a.coinId]?.[c]}
 function fxFor(a){const c=state.prices?.[a.coinId]; return c?.usd&&c?.mxn?c.mxn/c.usd:null}
 function convertPrice(v,from,to,a){v=num(v); if(!v||from===to)return v; const fx=fxFor(a); if(!fx)return NaN; return from==="usd"&&to==="mxn"?v*fx:v/fx}
@@ -40,16 +40,103 @@ function render(){
     const n=$("assetTemplate").content.cloneNode(true);n.querySelector(".coin-avatar").textContent=(a.symbol||"?").slice(0,1).toUpperCase();n.querySelector(".coin-name").textContent=a.name;n.querySelector(".symbol").textContent=a.symbol;n.querySelector(".amount-text").textContent=`${t.amount} ${a.symbol}`;n.querySelector(".current-price").textContent=fmt(t.price);n.querySelector(".asset-value").textContent=fmt(t.value);n.querySelector(".summary-price").textContent=fmt(t.price);n.querySelector(".summary-value").textContent=Number.isFinite(t.value)?`Valor ${fmt(t.value)}`:"Valor —";n.querySelector(".avg-price").textContent=Number.isFinite(t.avg)?fmt(t.avg):"Sin compras";
     const ch=state.prices?.[a.coinId]?.[`${state.displayCurrency}_24h_change`],chEl=n.querySelector(".change24");chEl.textContent=Number.isFinite(ch)?`${formatPct(ch)} en 24 h`:"Cambio 24 h —";chEl.classList.add(pctClass(ch));
     const pe=n.querySelector(".asset-pnl");pe.textContent=Number.isFinite(t.pnl)?`${fmt(t.pnl)} · ${formatPct(t.pnlPct)}`:"Sin costo";pe.classList.add(pctClass(t.pnl));
-    populateMarketContext(n,a,t);const loc=n.querySelector(".locations-row");(a.lots||[]).forEach(l=>{const c=document.createElement("span");c.className="chip";c.textContent=`${l.location||"Sin ubicación"} · ${l.amount} ${a.symbol}`;loc.appendChild(c)});
+    populateMarketContext(n,a,t);const loc=n.querySelector(".locations-row");renderLocationGroups(loc,a,index);
     const goals=n.querySelector(".goals-row");let best=null;(a.goals||[]).forEach(g=>{const gs=goalState(g,a),c=document.createElement("span");c.className="chip goal-chip";c.innerHTML=`<span class="status-dot status-${gs.status}"></span>${escapeHtml(g.label||"Meta")} ${fmt(g.price,g.currency||"usd")} · ${gs.label}${Number.isFinite(gs.distance)&&gs.distance>0?` (${gs.distance.toFixed(1)}%)`:""}`;goals.appendChild(c);if(["hit","near","close"].includes(gs.status)&&(!best||(["hit","near","close"].indexOf(gs.status)<["hit","near","close"].indexOf(best.status))))best=gs});
     if(best){const d=n.querySelector(".goal-dot");d.classList.remove("hidden");d.classList.add(`status-${best.status}`)}
     n.querySelector(".allocation").textContent=totalValue&&Number.isFinite(t.value)?`${(t.value/totalValue*100).toFixed(1)}% del portafolio`:"— del portafolio";
-    const summary=n.querySelector(".asset-summary"),details=n.querySelector(".asset-details"),chevron=n.querySelector(".chevron");summary.addEventListener("click",()=>{const open=details.classList.toggle("hidden")===false;summary.setAttribute("aria-expanded",String(open));chevron.classList.toggle("open",open)});n.querySelector(".edit-btn").addEventListener("click",e=>{e.stopPropagation();openEdit(index)});n.querySelector(".delete-btn").addEventListener("click",e=>{e.stopPropagation();if(confirm(`¿Eliminar ${a.name}?`)){state.assets.splice(index,1);save();render();fetchPrices()}});
+    const summary=n.querySelector(".asset-summary"),details=n.querySelector(".asset-details"),chevron=n.querySelector(".chevron");summary.addEventListener("click",()=>{const willOpen=details.classList.contains("hidden");document.querySelectorAll("#portfolioList .asset-details").forEach(d=>d.classList.add("hidden"));document.querySelectorAll("#portfolioList .asset-summary").forEach(b=>b.setAttribute("aria-expanded","false"));document.querySelectorAll("#portfolioList .chevron").forEach(c=>c.classList.remove("open"));if(willOpen){details.classList.remove("hidden");summary.setAttribute("aria-expanded","true");chevron.classList.add("open")}});n.querySelector(".avg-sim-btn").addEventListener("click",e=>{e.stopPropagation();openAverageSimulator(index)});n.querySelector(".edit-btn").addEventListener("click",e=>{e.stopPropagation();openEdit(index)});n.querySelector(".delete-btn").addEventListener("click",e=>{e.stopPropagation();if(confirm(`¿Eliminar ${a.name}?`)){state.assets.splice(index,1);save();render();fetchPrices()}});
     list.appendChild(n)
   });
   const totalPnl=totalCost?totalValue-totalCost:NaN,totalPct=totalCost?totalPnl/totalCost*100:NaN;$("totalValue").textContent=fmt(totalValue);$("totalCost").textContent=totalCost?fmt(totalCost):"—";$("totalPnl").textContent=Number.isFinite(totalPnl)?fmt(totalPnl):"—";$("totalPnl").className=pctClass(totalPnl);$("totalPct").textContent=formatPct(totalPct);$("totalPct").className=pctClass(totalPct);
   renderGoals(calc);renderAllocation(calc,totalValue)
 }
+
+function lotMetrics(a,l){
+  const amount=num(l.amount), cur=getPrice(a);
+  const buy=convertPrice(l.buyPrice,l.buyCurrency||"usd",state.displayCurrency,a);
+  const cost=Number.isFinite(buy)?amount*buy:NaN;
+  const value=Number.isFinite(cur)?amount*cur:NaN;
+  const pnl=Number.isFinite(cost)&&Number.isFinite(value)?value-cost:NaN;
+  const pnlPct=cost&&Number.isFinite(value)?pnl/cost*100:NaN;
+  return {amount,buy,cost,value,pnl,pnlPct};
+}
+function renderLocationGroups(container,a,assetIndex){
+  container.innerHTML="";
+  const groups=new Map();
+  (a.lots||[]).forEach((lot,lotIndex)=>{const key=(lot.location||"Sin ubicación").trim()||"Sin ubicación";if(!groups.has(key))groups.set(key,[]);groups.get(key).push({lot,lotIndex})});
+  groups.forEach((items,location)=>{
+    let amount=0,cost=0,value=0,validCost=true,validValue=true;
+    items.forEach(({lot})=>{const m=lotMetrics(a,lot);amount+=m.amount;if(Number.isFinite(m.cost))cost+=m.cost;else validCost=false;if(Number.isFinite(m.value))value+=m.value;else validValue=false});
+    const pnl=validCost&&validValue?value-cost:NaN,pnlPct=cost&&Number.isFinite(pnl)?pnl/cost*100:NaN;
+    const group=document.createElement("div");group.className="location-group";
+    group.innerHTML=`<button type="button" class="location-summary" aria-expanded="false"><div class="location-summary-main"><div class="location-summary-left"><strong>${escapeHtml(location)}</strong><small>${amount} ${escapeHtml(a.symbol)} · ${items.length} ${items.length===1?"compra":"compras"}</small></div><div class="location-summary-right"><strong>${validValue?fmt(value):"—"}</strong><small class="group-pnl ${pctClass(pnl)}">${Number.isFinite(pnl)?`${fmt(pnl)} · ${formatPct(pnlPct)}`:"—"}</small></div></div><span class="location-chevron">⌄</span></button><div class="location-lots hidden"></div>`;
+    const list=group.querySelector(".location-lots");
+    items.forEach(({lot,lotIndex},i)=>{
+      const m=lotMetrics(a,lot), card=document.createElement("div");card.className="lot-card";
+      card.innerHTML=`<div class="lot-top"><div class="lot-main"><strong>Compra ${i+1} · ${m.amount} ${escapeHtml(a.symbol)}</strong><small>Precio de compra: ${fmt(convertPrice(lot.buyPrice,lot.buyCurrency||"usd",state.displayCurrency,a))} / ${escapeHtml(a.symbol)}</small></div><strong class="${pctClass(m.pnl)}">${formatPct(m.pnlPct)}</strong></div><div class="lot-stats"><div><span>Invertido</span><strong>${fmt(m.cost)}</strong></div><div><span>Valor actual</span><strong>${fmt(m.value)}</strong></div><div><span>Ganancia / pérdida</span><strong class="${pctClass(m.pnl)}">${fmt(m.pnl)}</strong></div></div><div class="lot-actions"><button type="button" class="secondary lot-edit">Editar compra</button><button type="button" class="danger lot-delete">Eliminar compra</button></div>`;
+      card.querySelector(".lot-edit").addEventListener("click",e=>{e.stopPropagation();openLotEdit(assetIndex,lotIndex)});
+      card.querySelector(".lot-delete").addEventListener("click",e=>{e.stopPropagation();deleteLot(assetIndex,lotIndex)});
+      list.appendChild(card);
+    });
+    const summary=group.querySelector(".location-summary"),chev=group.querySelector(".location-chevron");
+    summary.addEventListener("click",()=>{const open=list.classList.toggle("hidden")===false;summary.setAttribute("aria-expanded",String(open));chev.classList.toggle("open",open)});
+    container.appendChild(group);
+  });
+}
+function openLotEdit(assetIndex,lotIndex){
+  const lot=state.assets?.[assetIndex]?.lots?.[lotIndex];if(!lot)return;
+  $("lotAssetIndex").value=assetIndex;$("lotIndex").value=lotIndex;$("lotEditAmount").value=lot.amount??"";$("lotEditPrice").value=lot.buyPrice??"";$("lotEditCurrency").value=lot.buyCurrency||"usd";$("lotEditLocation").value=lot.location||"";$("lotDialog").showModal();
+}
+function closeLotDialog(){$("lotDialog").close()}
+function deleteLot(assetIndex,lotIndex){
+  const a=state.assets?.[assetIndex];if(!a)return;const lot=a.lots?.[lotIndex];
+  if(!confirm(`¿Eliminar esta compra de ${a.symbol}${lot?.location?` en ${lot.location}`:""}?`))return;
+  if(a.lots.length===1){if(confirm(`Era la última compra de ${a.symbol}. ¿Eliminar también la cripto del portafolio?`)){state.assets.splice(assetIndex,1);save();render()}return}
+  a.lots.splice(lotIndex,1);save();render();
+}
+
+
+function getPresetValues(){
+  const c=state.displayCurrency;
+  const defaults=c==="mxn"?[5000,10000,20000]:[250,500,1000];
+  const vals=Array.isArray(state.avgPresets?.[c])?state.avgPresets[c]:defaults;
+  return [0,1,2].map(i=>num(vals[i])||defaults[i]);
+}
+function setPresetValues(vals){state.avgPresets[state.displayCurrency]=vals.map(v=>Math.max(0,num(v)));save()}
+function simulateAverage(a,invest){
+  const t=totalsFor(a), price=Number(t.price), money=num(invest);
+  if(!(t.amount>0)||!(t.cost>0)||!(price>0)||!(money>0))return null;
+  const addedAmount=money/price,newAmount=t.amount+addedAmount,newCost=t.cost+money,newAvg=newCost/newAmount;
+  const reduction=t.avg-newAvg,reductionPct=t.avg?reduction/t.avg*100:NaN;
+  const rebound=price?((newAvg-price)/price*100):NaN;
+  return {money,addedAmount,newAmount,newCost,newAvg,reduction,reductionPct,rebound};
+}
+function renderAverageSimulator(){
+  const ai=Number($("avgAssetIndex").value),a=state.assets?.[ai];if(!a)return;
+  const t=totalsFor(a), cur=Number(t.price);
+  $("avgCurrentPrice").textContent=fmt(cur);$("avgCurrentAvg").textContent=Number.isFinite(t.avg)?fmt(t.avg):"—";$("avgCurrentCost").textContent=fmt(t.cost);$("avgCurrentAmount").textContent=`${t.amount} ${a.symbol}`;
+  const vals=getPresetValues();[$("avgPreset1"),$("avgPreset2"),$("avgPreset3")].forEach((el,i)=>{if(document.activeElement!==el)el.value=vals[i]});$("avgPresetCurrency").textContent=`Montos en ${state.displayCurrency.toUpperCase()}`;
+  const custom=num($("avgCustomAmount").value), amounts=[...vals];if(custom>0&&!amounts.includes(custom))amounts.push(custom);
+  const box=$("avgResults");box.innerHTML="";
+  amounts.filter(v=>v>0).forEach(v=>{const r=simulateAverage(a,v),row=document.createElement("div");row.className="avg-result-card";if(!r){row.textContent="No hay datos suficientes para calcular.";box.appendChild(row);return}
+    row.innerHTML=`<div class="avg-result-head"><strong>Invertir ${fmt(r.money)}</strong><span>${r.addedAmount.toFixed(6)} ${escapeHtml(a.symbol)}</span></div><div class="avg-result-grid"><div><span>Nuevo promedio</span><strong>${fmt(r.newAvg)}</strong></div><div><span>Baja del promedio</span><strong class="positive">${fmt(r.reduction)} · ${Number.isFinite(r.reductionPct)?r.reductionPct.toFixed(1)+"%":"—"}</strong></div><div><span>Subida para recuperar</span><strong>${Number.isFinite(r.rebound)?r.rebound.toFixed(1)+"%":"—"}</strong></div></div>`;box.appendChild(row)});
+}
+function openAverageSimulator(assetIndex){
+  const a=state.assets?.[assetIndex],t=a?totalsFor(a):null;if(!a||!t)return;
+  if(!(t.price>0)){alert("Primero necesito el precio actual de esta cripto para simular.");return}
+  $("avgAssetIndex").value=assetIndex;$("avgDialogTitle").textContent=`Bajar promedio · ${a.symbol}`;$("avgCustomAmount").value="";$("avgTargetPrice").value="";$("avgTargetResult").classList.add("hidden");renderAverageSimulator();$("avgDialog").showModal();
+}
+function calculateTargetAverage(){
+  const ai=Number($("avgAssetIndex").value),a=state.assets?.[ai];if(!a)return;const t=totalsFor(a),target=num($("avgTargetPrice").value),cur=Number(t.price),out=$("avgTargetResult");
+  out.classList.remove("hidden","positive","negative");
+  if(!(target>0)||!(cur>0)||!(t.avg>0)){out.textContent="Escribe un promedio objetivo válido.";return}
+  if(target>=t.avg){out.textContent=`Ya estás en un promedio de ${fmt(t.avg)}; el objetivo debe ser menor para simular bajarlo.`;return}
+  if(target<=cur){out.textContent=`Con compras al precio actual (${fmt(cur)}), el promedio puede acercarse a ese precio pero no llegar a ${fmt(target)}. Necesitarías comprar por debajo de ese nivel.`;out.classList.add("negative");return}
+  const units=t.amount*(t.avg-target)/(target-cur),money=units*cur;
+  if(!(units>0)&&!(money>0)){out.textContent="No se pudo calcular ese objetivo.";return}
+  out.innerHTML=`Para bajar tu promedio de <strong>${fmt(t.avg)}</strong> a <strong>${fmt(target)}</strong>, comprando al precio actual de <strong>${fmt(cur)}</strong>, necesitarías invertir aproximadamente <strong>${fmt(money)}</strong> y comprar <strong>${units.toFixed(6)} ${escapeHtml(a.symbol)}</strong>.`;
+}
+
 function renderGoals(calc){
   const items=[];calc.forEach(({a,t})=>(a.goals||[]).forEach(g=>{const s=goalState(g,a);if(["hit","near","close"].includes(s.status))items.push({a,g,s,t})}));items.sort((x,y)=>(x.s.status==="hit"?-999:x.s.distance)-(y.s.status==="hit"?-999:y.s.distance));
   $("goalPanel").classList.toggle("hidden",!items.length);const gl=$("goalList");gl.innerHTML="";items.forEach(({a,g,s,t})=>{const e=document.createElement("div");e.className="goal-card";e.innerHTML=`<div><strong>${escapeHtml(a.name)} · ${escapeHtml(g.label||"Meta")}</strong><small>${fmt(t.price)} → ${fmt(convertPrice(g.price,g.currency||"usd",state.displayCurrency,a))}</small></div><div style="text-align:right"><div class="goal-status">${s.label}</div><small>${s.status==="hit"?"Objetivo tocado":`Falta ${Math.max(0,s.distance).toFixed(1)}%`}</small></div>`;gl.appendChild(e)})
@@ -154,6 +241,16 @@ $("coinSearch").addEventListener("input",e=>{$("coinId").value="";state.selected
 $("addBtn").addEventListener("click",openAdd);$("emptyAddBtn").addEventListener("click",openAdd);$("closeDialog").addEventListener("click",closeDialog);$("cancelBtn").addEventListener("click",closeDialog);$("addLotBtn").addEventListener("click",()=>addLotRow());$("addGoalBtn").addEventListener("click",()=>addGoalRow());$("refreshBtn").addEventListener("click",fetchPrices);
 document.querySelectorAll(".currency").forEach(b=>b.addEventListener("click",()=>{state.displayCurrency=b.dataset.currency;save();render()}));
 $("backupBtn").addEventListener("click",()=>$("backupDialog").showModal());$("closeBackup").addEventListener("click",()=>$("backupDialog").close());
-$("exportBtn").addEventListener("click",()=>{const blob=new Blob([JSON.stringify({version:"1.1",exportedAt:new Date().toISOString(),assets:state.assets,displayCurrency:state.displayCurrency},null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`mi-portafolio-cripto-${new Date().toISOString().slice(0,10)}.json`;a.click();URL.revokeObjectURL(a.href)});
-$("importInput").addEventListener("change",async e=>{const f=e.target.files?.[0];if(!f)return;try{const d=JSON.parse(await f.text());if(!Array.isArray(d.assets))throw new Error();if(confirm("Esto reemplazará el portafolio actual. ¿Continuar?")){state.assets=d.assets;state.displayCurrency=d.displayCurrency||"mxn";save();$("backupDialog").close();render();fetchPrices()}}catch{alert("El archivo no parece ser un respaldo válido.")}e.target.value=""});
+$("exportBtn").addEventListener("click",()=>{const blob=new Blob([JSON.stringify({version:"1.6",exportedAt:new Date().toISOString(),assets:state.assets,displayCurrency:state.displayCurrency,avgPresets:state.avgPresets},null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`mi-portafolio-cripto-${new Date().toISOString().slice(0,10)}.json`;a.click();URL.revokeObjectURL(a.href)});
+$("importInput").addEventListener("change",async e=>{const f=e.target.files?.[0];if(!f)return;try{const d=JSON.parse(await f.text());if(!Array.isArray(d.assets))throw new Error();if(confirm("Esto reemplazará el portafolio actual. ¿Continuar?")){state.assets=d.assets;state.displayCurrency=d.displayCurrency||"mxn";if(d.avgPresets)state.avgPresets={...state.avgPresets,...d.avgPresets};save();$("backupDialog").close();render();fetchPrices()}}catch{alert("El archivo no parece ser un respaldo válido.")}e.target.value=""});
+
+$("closeLotDialog").addEventListener("click",closeLotDialog);$("cancelLotBtn").addEventListener("click",closeLotDialog);
+$("lotForm").addEventListener("submit",e=>{e.preventDefault();const ai=Number($("lotAssetIndex").value),li=Number($("lotIndex").value),a=state.assets?.[ai];if(!a||!a.lots?.[li])return;const amount=num($("lotEditAmount").value),buyPrice=num($("lotEditPrice").value);if(amount<=0){alert("La cantidad debe ser mayor que cero.");return}if(buyPrice<0){alert("El precio de compra no puede ser negativo.");return}a.lots[li]={amount,buyPrice,buyCurrency:$("lotEditCurrency").value,location:$("lotEditLocation").value.trim()};save();closeLotDialog();render();});
+
+$("closeAvgDialog").addEventListener("click",()=>$("avgDialog").close());
+[$("avgPreset1"),$("avgPreset2"),$("avgPreset3")].forEach(el=>el.addEventListener("input",()=>{setPresetValues([num($("avgPreset1").value),num($("avgPreset2").value),num($("avgPreset3").value)]);renderAverageSimulator()}));
+$("avgCustomAmount").addEventListener("input",renderAverageSimulator);
+$("avgCalcTarget").addEventListener("click",calculateTargetAverage);
+$("avgTargetPrice").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();calculateTargetAverage()}});
+
 load();loadMarketContext();try{state.prices=JSON.parse(localStorage.getItem(STORAGE_KEY+"_prices")||"{}")}catch{}render();fetchPrices();setInterval(fetchPrices,5*60*1000);if("serviceWorker"in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{}));
