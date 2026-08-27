@@ -28,10 +28,44 @@ function goalState(goal,a){
   if(distance<=15)return {status:"close",label:"Acercándose",distance};
   return {status:"far",label:"Lejos de meta",distance};
 }
-async function fetchPrices(){if(!state.assets.length){render();return}const ids=[...new Set(state.assets.map(a=>a.coinId).filter(Boolean))];$("refreshBtn").textContent="…";clearError();try{
-  const u=new URL("https://api.coingecko.com/api/v3/simple/price");u.searchParams.set("ids",ids.join(","));u.searchParams.set("vs_currencies","usd,mxn");u.searchParams.set("include_24hr_change","true");u.searchParams.set("include_last_updated_at","true");
-  const r=await fetch(u);if(!r.ok)throw new Error(`HTTP ${r.status}`);state.prices=await r.json();localStorage.setItem(STORAGE_KEY+"_prices",JSON.stringify(state.prices));$("lastUpdated").textContent="Actualizado "+new Date().toLocaleTimeString("es-MX",{hour:"2-digit",minute:"2-digit"});render();
-}catch(e){try{state.prices=JSON.parse(localStorage.getItem(STORAGE_KEY+"_prices")||"{}")}catch{}showError("No se pudieron actualizar los precios. Se muestran los últimos datos guardados.");render()}finally{$("refreshBtn").textContent="↻";fetchAllMarketContext()}}
+let pricesRequestInFlight=false;
+async function fetchJson(url,timeoutMs=9000){
+  const ctl=new AbortController(); const timer=setTimeout(()=>ctl.abort(),timeoutMs);
+  try{const r=await fetch(url,{signal:ctl.signal,cache:"no-store",headers:{"accept":"application/json"}});if(!r.ok){const e=new Error(`HTTP ${r.status}`);e.status=r.status;throw e}return await r.json()}finally{clearTimeout(timer)}
+}
+async function fetchPricesFallback(ids){
+  // Respaldo independiente de CoinGecko: Binance (USD/USDT) + tipo de cambio USD/MXN.
+  const fxData=await fetchJson("https://open.er-api.com/v6/latest/USD",7000);
+  const usdMxn=Number(fxData?.rates?.MXN); if(!Number.isFinite(usdMxn))throw new Error("FX no disponible");
+  const out={};
+  for(const a of state.assets){
+    if(!a.coinId||out[a.coinId])continue;
+    const sym=String(a.symbol||"").toUpperCase().replace(/[^A-Z0-9]/g,"");
+    if(!sym)continue;
+    try{
+      const d=await fetchJson(`https://data-api.binance.vision/api/v3/ticker/24hr?symbol=${encodeURIComponent(sym+"USDT")}`,6500);
+      const usd=Number(d.lastPrice), ch=Number(d.priceChangePercent);
+      if(Number.isFinite(usd)&&usd>0)out[a.coinId]={usd,mxn:usd*usdMxn,usd_24h_change:Number.isFinite(ch)?ch:null,mxn_24h_change:Number.isFinite(ch)?ch:null,last_updated_at:Math.floor(Date.now()/1000)};
+    }catch{}
+  }
+  if(!Object.keys(out).length)throw new Error("Respaldo sin precios");
+  return out;
+}
+async function fetchPrices(){
+  if(!state.assets.length){render();return}
+  if(pricesRequestInFlight)return;
+  pricesRequestInFlight=true;
+  const ids=[...new Set(state.assets.map(a=>a.coinId).filter(Boolean))];$("refreshBtn").textContent="…";clearError();
+  try{
+    const u=new URL("https://api.coingecko.com/api/v3/simple/price");u.searchParams.set("ids",ids.join(","));u.searchParams.set("vs_currencies","usd,mxn");u.searchParams.set("include_24hr_change","true");u.searchParams.set("include_last_updated_at","true");
+    try{state.prices=await fetchJson(u,9000)}catch(primaryError){state.prices=await fetchPricesFallback(ids)}
+    localStorage.setItem(STORAGE_KEY+"_prices",JSON.stringify(state.prices));localStorage.setItem(STORAGE_KEY+"_prices_time",String(Date.now()));
+    $("lastUpdated").textContent="Actualizado "+new Date().toLocaleTimeString("es-MX",{hour:"2-digit",minute:"2-digit"});render();
+  }catch(e){
+    try{state.prices=JSON.parse(localStorage.getItem(STORAGE_KEY+"_prices")||"{}")}catch{}
+    showError(Object.keys(state.prices||{}).length?"No hubo conexión con los proveedores de precios. Se conservan los últimos precios guardados.":"No se pudieron obtener precios en este momento. Toca ↻ para reintentar.");render();
+  }finally{$("refreshBtn").textContent="↻";pricesRequestInFlight=false}
+}
 function showError(msg){let el=document.querySelector(".error-banner");if(!el){el=document.createElement("div");el.className="error-banner";document.querySelector(".container").prepend(el)}el.textContent=msg}
 function clearError(){document.querySelector(".error-banner")?.remove()}
 function render(){
@@ -315,4 +349,4 @@ $("avgCalcTarget").addEventListener("click",calculateTargetAverage);
 $("avgTargetPrice").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();calculateTargetAverage()}});
 $("compareCapitalBtn").addEventListener("click",compareNewCapital);
 
-load();loadMarketContext();try{state.prices=JSON.parse(localStorage.getItem(STORAGE_KEY+"_prices")||"{}")}catch{}render();fetchPrices();setInterval(fetchPrices,5*60*1000);if("serviceWorker"in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{}));
+load();loadMarketContext();try{state.prices=JSON.parse(localStorage.getItem(STORAGE_KEY+"_prices")||"{}")}catch{}render();fetchPrices();setInterval(fetchPrices,10*60*1000);if("serviceWorker"in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{}));

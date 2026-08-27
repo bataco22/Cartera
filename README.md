@@ -69,3 +69,10 @@ Los datos dependen de disponibilidad y límites de la API pública.
 - El simulador ahora compara: promediar la posición actual, abrir un lote independiente de la misma cripto y evaluar otra cripto con entrada/objetivo manuales.
 - Conserva el cálculo de cuánto capital se necesita para bajar a un promedio objetivo.
 - Todos los cálculos son informativos y no ejecutan operaciones.
+
+
+## v1.7.3
+- Actualización de precios robusta: CoinGecko primario y respaldo Binance + USD/MXN.
+- Las consultas de contexto ya no se disparan masivamente después de cada actualización de precios.
+- Bloqueo de solicitudes simultáneas, timeout y caché local de últimos precios válidos.
+- Refresco automático reducido a cada 10 minutos para disminuir límites de API.
