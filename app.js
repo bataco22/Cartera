@@ -1,11 +1,42 @@
 
 const STORAGE_KEY="mi_portafolio_cripto_v1_1";
 const state={assets:[],prices:{},marketContext:{},displayCurrency:"mxn",selectedCoin:null,searchTimer:null,avgPresets:{mxn:[5000,10000,20000],usd:[250,500,1000]}};
+
+function normalizeAssets(rawAssets){
+  const out=[];
+  const byId=new Map();
+  (Array.isArray(rawAssets)?rawAssets:[]).forEach(raw=>{
+    if(!raw||typeof raw!=="object")return;
+    const coinId=String(raw.coinId||"").trim();
+    const symbol=String(raw.symbol||"").trim().toUpperCase();
+    const name=String(raw.name||symbol||coinId||"Cripto").trim();
+    if(!coinId&&!symbol)return;
+    const key=coinId||`symbol:${symbol}`;
+    const lots=(Array.isArray(raw.lots)?raw.lots:[]).map(l=>({
+      ...l,
+      amount:Number(l?.amount)>0?Number(l.amount):0,
+      buyPrice:Number(l?.buyPrice)>0?Number(l.buyPrice):null,
+      targetPrice:Number(l?.targetPrice)>0?Number(l.targetPrice):null
+    })).filter(l=>l.amount>0);
+    const goals=(Array.isArray(raw.goals)?raw.goals:[]).filter(Boolean);
+    if(byId.has(key)){
+      const a=byId.get(key);
+      a.lots.push(...lots);
+      a.goals.push(...goals);
+      if(!a.name&&name)a.name=name;
+      if(!a.symbol&&symbol)a.symbol=symbol;
+      return;
+    }
+    const a={...raw,coinId,name,symbol,lots,goals};
+    byId.set(key,a);out.push(a);
+  });
+  return out;
+}
 const $=id=>document.getElementById(id); const num=v=>Number(v||0);
 const fmt=(n,c=state.displayCurrency)=>Number.isFinite(Number(n))?new Intl.NumberFormat("es-MX",{style:"currency",currency:c.toUpperCase(),maximumFractionDigits:Math.abs(Number(n))<10?4:2}).format(Number(n)):"—";
 const pctClass=v=>!Number.isFinite(v)||v===0?"":v>0?"positive":"negative"; const formatPct=v=>Number.isFinite(v)?`${v>=0?"+":""}${v.toFixed(2)}%`:"—";
 function escapeHtml(s){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
-function load(){try{const d=JSON.parse(localStorage.getItem(STORAGE_KEY)||"{}");state.assets=Array.isArray(d.assets)?d.assets:[];state.displayCurrency=d.displayCurrency||"mxn";if(d.avgPresets&&typeof d.avgPresets==="object")state.avgPresets={...state.avgPresets,...d.avgPresets}}catch{state.assets=[]}}
+function load(){try{const d=JSON.parse(localStorage.getItem(STORAGE_KEY)||"{}");state.assets=normalizeAssets(d.assets);state.displayCurrency=d.displayCurrency||"mxn";if(d.avgPresets&&typeof d.avgPresets==="object")state.avgPresets={...state.avgPresets,...d.avgPresets};save()}catch{state.assets=[]}}
 function save(){localStorage.setItem(STORAGE_KEY,JSON.stringify({assets:state.assets,displayCurrency:state.displayCurrency,avgPresets:state.avgPresets}))}
 function getPrice(a,c=state.displayCurrency){return state.prices?.[a.coinId]?.[c]}
 function fxFor(a){const c=state.prices?.[a.coinId]; return c?.usd&&c?.mxn?c.mxn/c.usd:null}
@@ -370,7 +401,12 @@ $("assetForm").addEventListener("submit",e=>{
     const goals=[...document.querySelectorAll(".goal-edit-row")].map(r=>({label:r.querySelector(".goal-label").value.trim()||"Meta",price:optionalNum(r.querySelector(".goal-price").value),currency:r.querySelector(".goal-currency").value})).filter(g=>g.price!==null&&g.price>0);
     const a={coinId:$("coinId").value,name:state.selectedCoin.name,symbol:state.selectedCoin.symbol.toUpperCase(),lots,goals};
     const idx=$("editIndex").value;
-    if(idx==="")state.assets.push(a);else state.assets[Number(idx)]=a;
+    if(idx===""){
+      const existing=state.assets.find(x=>x.coinId===a.coinId);
+      if(existing){existing.lots=[...(existing.lots||[]),...a.lots];existing.goals=[...(existing.goals||[]),...a.goals];existing.name=a.name;existing.symbol=a.symbol}
+      else state.assets.push(a);
+    }else state.assets[Number(idx)]=a;
+    state.assets=normalizeAssets(state.assets);
     save();
     closeDialog();
     render();
@@ -413,14 +449,7 @@ $("importInput").addEventListener("change",async e=>{
   try{
     const d=JSON.parse(await f.text()); if(!Array.isArray(d.assets))throw new Error();
     if(confirm("Esto reemplazará el portafolio actual. ¿Continuar?")){
-      state.assets=d.assets.map(a=>({
-        ...a,
-        lots:Array.isArray(a.lots)?a.lots.map(l=>({
-          ...l,
-          buyPrice:Number(l.buyPrice)>0?Number(l.buyPrice):null,
-          targetPrice:Number(l.targetPrice)>0?Number(l.targetPrice):null
-        })):[]
-      }));
+      state.assets=normalizeAssets(d.assets);
       state.displayCurrency=d.displayCurrency||"mxn";
       if(d.avgPresets)state.avgPresets={...state.avgPresets,...d.avgPresets};
       save();$("backupDialog").close();render();fetchPrices();

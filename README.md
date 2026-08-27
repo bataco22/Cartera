@@ -88,5 +88,5 @@ Los datos dependen de disponibilidad y límites de la API pública.
 - Refresco automático reducido a cada 10 minutos para disminuir límites de API.
 
 
-## v1.7.5 - Reset total
+## v1.7.6 - Reset total
 Se añadió un botón **Reset total** dentro de Respaldo. Borra únicamente los datos locales de esta app (cartera, compras, metas, precios guardados y contexto/caché de mercado), con doble confirmación y limpieza de la caché PWA.
