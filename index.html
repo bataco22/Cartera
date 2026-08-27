@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-title" content="Mi Portafolio" />
   <title>Mi Portafolio Cripto</title>
   <link rel="manifest" href="manifest.webmanifest" />
-  <link rel="stylesheet" href="styles.css?v=1.7.4" />
+  <link rel="stylesheet" href="styles.css?v=1.7.5" />
 </head>
 <body>
   <header class="topbar">
@@ -149,7 +149,9 @@
           Importar JSON
           <input id="importInput" type="file" accept="application/json" hidden />
         </label>
+        <button id="resetAllBtn" class="danger" type="button">Reset total</button>
       </div>
+      <p class="muted" style="margin-top:10px">Reset total borra criptos, compras, metas, precios guardados y datos locales de esta app. Exporta un respaldo antes si quieres conservarlos.</p>
     </div>
   </dialog>
 
@@ -326,6 +328,6 @@
     </article>
   </template>
 
-  <script src="app.js?v=1.7.4"></script>
+  <script src="app.js?v=1.7.5"></script>
 </body>
 </html>

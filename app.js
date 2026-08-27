@@ -386,6 +386,28 @@ $("addBtn").addEventListener("click",openAdd);$("emptyAddBtn").addEventListener(
 document.querySelectorAll(".currency").forEach(b=>b.addEventListener("click",()=>{state.displayCurrency=b.dataset.currency;save();render()}));
 $("backupBtn").addEventListener("click",()=>$("backupDialog").showModal());$("closeBackup").addEventListener("click",()=>$("backupDialog").close());
 $("exportBtn").addEventListener("click",()=>{const blob=new Blob([JSON.stringify({version:"1.7",exportedAt:new Date().toISOString(),assets:state.assets,displayCurrency:state.displayCurrency,avgPresets:state.avgPresets},null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`mi-portafolio-cripto-${new Date().toISOString().slice(0,10)}.json`;a.click();URL.revokeObjectURL(a.href)});
+
+async function resetAllAppData(){
+  const ok=confirm("¿Borrar TODA la cartera y los datos guardados de esta app? Esta acción no se puede deshacer salvo que tengas un respaldo JSON.");
+  if(!ok)return;
+  const ok2=confirm("Última confirmación: se borrarán criptos, compras, metas, precios y caché local. ¿Continuar?");
+  if(!ok2)return;
+  try{
+    Object.keys(localStorage).filter(k=>k===STORAGE_KEY||k.startsWith(STORAGE_KEY+"_")).forEach(k=>localStorage.removeItem(k));
+    try{sessionStorage.clear()}catch{}
+    try{if("caches" in window){const keys=await caches.keys();await Promise.all(keys.filter(k=>k.startsWith("mi-portafolio-cripto-")).map(k=>caches.delete(k)))}}catch{}
+    state.assets=[];state.prices={};state.marketContext={};state.displayCurrency="mxn";state.selectedCoin=null;state.avgPresets={mxn:[5000,10000,20000],usd:[250,500,1000]};
+    pricesRequestInFlight=false;
+    render();
+    try{$("backupDialog").close()}catch{}
+    alert("Reset completado. La cartera y los datos locales de Mi Portafolio Cripto fueron borrados.");
+    location.reload();
+  }catch(err){
+    console.error("Error en reset total",err);
+    alert("No se pudo completar el reset. No cierres la app y vuelve a intentarlo.");
+  }
+}
+$("resetAllBtn").addEventListener("click",resetAllAppData);
 $("importInput").addEventListener("change",async e=>{
   const f=e.target.files?.[0]; if(!f)return;
   try{
