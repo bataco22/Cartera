@@ -1,6 +1,6 @@
 
 const STORAGE_KEY="mi_portafolio_cripto_v1_1";
-const state={assets:[],prices:{},marketContext:{},displayCurrency:"mxn",selectedCoin:null,searchTimer:null,avgPresets:{mxn:[5000,10000,20000],usd:[250,500,1000]}};
+const state={assets:[],prices:{},marketContext:{},displayCurrency:"mxn",selectedCoin:null,searchTimer:null,avgPresets:{mxn:[5000,10000,20000],usd:[250,500,1000]},currentView:"all",privacyHidden:localStorage.getItem("mi_portafolio_privacy_hidden")==="1"};
 
 function normalizeAssets(rawAssets){
   const out=[];
@@ -16,7 +16,8 @@ function normalizeAssets(rawAssets){
       ...l,
       amount:Number(l?.amount)>0?Number(l.amount):0,
       buyPrice:Number(l?.buyPrice)>0?Number(l.buyPrice):null,
-      targetPrice:Number(l?.targetPrice)>0?Number(l.targetPrice):null
+      targetPrice:Number(l?.targetPrice)>0?Number(l.targetPrice):null,
+      bucket:l?.bucket==="new"?"new":"old"
     })).filter(l=>l.amount>0);
     const goals=(Array.isArray(raw.goals)?raw.goals:[]).filter(Boolean);
     if(byId.has(key)){
@@ -152,7 +153,12 @@ function render(){
   document.querySelectorAll(".currency").forEach(b=>b.classList.toggle("active",b.dataset.currency===state.displayCurrency));
   $("coinCount").textContent=`${state.assets.length} ${state.assets.length===1?"activo":"activos"}`;$("emptyState").classList.toggle("hidden",state.assets.length>0);$("portfolioList").classList.toggle("hidden",state.assets.length===0);
   const list=$("portfolioList");list.innerHTML="";let totalValue=0,totalCost=0;
-  const calc=state.assets.map((a,assetIndex)=>({a,t:totalsFor(a),assetIndex}));
+  const calc=state.assets.map((a,assetIndex)=>{
+    const lots=(a.lots||[]).map((l,li)=>({...l,__originalLotIndex:li}));
+    const shownLots=state.currentView==="new"?lots.filter(l=>l.bucket==="new"):lots;
+    const shown={...a,lots:shownLots};
+    return {a:shown,t:totalsFor(shown),assetIndex};
+  }).filter(x=>state.currentView!=="new"||x.a.lots.length>0);
   calc.forEach(x=>{if(Number.isFinite(x.t.value))totalValue+=x.t.value;if(Number.isFinite(x.t.cost)&&x.t.cost>0)totalCost+=x.t.cost});
   // Los activos con datos incompletos van primero para que nunca queden "ocultos" al final.
   const displayCalc=[...calc].sort((x,y)=>Number(y.t.hasUnknownCost)-Number(x.t.hasUnknownCost));
@@ -196,7 +202,7 @@ function renderLocationGroups(container,a,assetIndex){
     const group=document.createElement("div");group.className="location-group";
     group.innerHTML=`<button type="button" class="location-summary" aria-expanded="false"><div class="location-summary-main"><div class="location-summary-left"><strong>${escapeHtml(location)}</strong><small>${amount} ${escapeHtml(a.symbol)} · ${items.length} ${items.length===1?"compra":"compras"}</small></div><div class="location-summary-right"><strong>${validValue?fmt(value):"—"}</strong><small class="group-pnl ${pctClass(pnl)}">${Number.isFinite(pnl)?`${fmt(pnl)} · ${formatPct(pnlPct)}`:"—"}</small></div></div><span class="location-chevron">⌄</span></button><div class="location-lots hidden"></div>`;
     const list=group.querySelector(".location-lots");
-    items.forEach(({lot,lotIndex},i)=>{
+    items.forEach(({lot,lotIndex},i)=>{ lotIndex=Number.isInteger(lot.__originalLotIndex)?lot.__originalLotIndex:lotIndex;
       const m=lotMetrics(a,lot), card=document.createElement("div");card.className="lot-card";
       const purposeLabel=lot.purpose==="opportunity"?"Nueva oportunidad":lot.purpose==="recovery"?"Recuperación":"Largo plazo";
       const target=lot.targetPrice>0?convertPrice(lot.targetPrice,lot.targetCurrency||lot.buyCurrency||"usd",state.displayCurrency,a):NaN;
@@ -214,7 +220,7 @@ function renderLocationGroups(container,a,assetIndex){
 }
 function openLotEdit(assetIndex,lotIndex){
   const lot=state.assets?.[assetIndex]?.lots?.[lotIndex];if(!lot)return;
-  $("lotAssetIndex").value=assetIndex;$("lotIndex").value=lotIndex;$("lotEditAmount").value=lot.amount??"";$("lotEditPrice").value=lot.buyPrice??"";$("lotEditCurrency").value=lot.buyCurrency||"usd";$("lotEditLocation").value=lot.location||"";$("lotEditPurpose").value=lot.purpose||"long";$("lotEditTarget").value=lot.targetPrice??"";$("lotEditTargetCurrency").value=lot.targetCurrency||lot.buyCurrency||"usd";$("lotDialog").showModal();
+  $("lotAssetIndex").value=assetIndex;$("lotIndex").value=lotIndex;$("lotEditAmount").value=lot.amount??"";$("lotEditPrice").value=lot.buyPrice??"";$("lotEditCurrency").value=lot.buyCurrency||"usd";$("lotEditLocation").value=lot.location||"";$("lotEditBucket").value=lot.bucket||"old";$("lotEditPurpose").value=lot.purpose||"long";$("lotEditTarget").value=lot.targetPrice??"";$("lotEditTargetCurrency").value=lot.targetCurrency||lot.buyCurrency||"usd";$("lotDialog").showModal();
 }
 function closeLotDialog(){$("lotDialog").close()}
 function deleteLot(assetIndex,lotIndex){
@@ -382,7 +388,7 @@ function populateMarketContext(node,a,t){
 
 async function searchCoins(q){const box=$("searchResults");if(!q||q.trim().length<2){box.innerHTML="";return}try{const r=await fetch(`https://api.coingecko.com/api/v3/search?query=${encodeURIComponent(q.trim())}`);if(!r.ok)throw new Error();const d=await r.json();box.innerHTML="";(d.coins||[]).slice(0,8).forEach(c=>{const b=document.createElement("button");b.type="button";b.className="search-item";b.innerHTML=`<span>${escapeHtml(c.name)}</span><span>${escapeHtml(c.symbol)}</span>`;b.addEventListener("click",()=>selectCoin({coinId:c.id,name:c.name,symbol:c.symbol.toUpperCase()}));box.appendChild(b)})}catch{box.innerHTML=`<div style="padding:12px;color:#6b7280;font-size:13px">No se pudo buscar ahora.</div>`}}
 function selectCoin(c){state.selectedCoin=c;$("coinId").value=c.coinId;$("coinSearch").value=`${c.name} (${c.symbol})`;$("selectedCoin").textContent=`Seleccionada: ${c.name} · ${c.symbol}`;$("selectedCoin").classList.remove("hidden");$("searchResults").innerHTML=""}
-function addLotRow(v={}){const e=document.createElement("div");e.className="editor-row lot-row";e.innerHTML=`<div class="grid3"><label>Cantidad<input class="lot-amount" type="number" step="any" min="0" value="${v.amount??""}" placeholder="0.00"></label><label>Precio compra<input class="lot-price" type="number" step="any" min="0" value="${v.buyPrice??""}" placeholder="0.00"></label><label>Moneda<select class="lot-currency"><option value="usd"${(v.buyCurrency||"usd")==="usd"?" selected":""}>USD</option><option value="mxn"${v.buyCurrency==="mxn"?" selected":""}>MXN</option></select></label></div><label>Exchange / Wallet<input class="lot-location" value="${escapeHtml(v.location||"")}" placeholder="Binance, Bitso, Ledger..."></label><div class="grid3"><label>Intención<select class="lot-purpose"><option value="long"${(v.purpose||"long")==="long"?" selected":""}>Largo plazo</option><option value="recovery"${v.purpose==="recovery"?" selected":""}>Recuperación</option><option value="opportunity"${v.purpose==="opportunity"?" selected":""}>Nueva oportunidad</option></select></label><label>Objetivo salida<input class="lot-target" type="number" step="any" min="0" value="${v.targetPrice??""}" placeholder="Opcional"></label><label>Moneda objetivo<select class="lot-target-currency"><option value="usd"${(v.targetCurrency||v.buyCurrency||"usd")==="usd"?" selected":""}>USD</option><option value="mxn"${(v.targetCurrency||v.buyCurrency)==="mxn"?" selected":""}>MXN</option></select></label></div><button type="button" class="danger small remove-row">Eliminar compra</button>`;e.querySelector(".remove-row").addEventListener("click",()=>e.remove());$("lotsEditor").appendChild(e)}
+function addLotRow(v={}){const e=document.createElement("div");e.className="editor-row lot-row";e.innerHTML=`<div class="grid3"><label>Cantidad<input class="lot-amount" type="number" step="any" min="0" value="${v.amount??""}" placeholder="0.00"></label><label>Precio compra<input class="lot-price" type="number" step="any" min="0" value="${v.buyPrice??""}" placeholder="0.00"></label><label>Moneda<select class="lot-currency"><option value="usd"${(v.buyCurrency||"usd")==="usd"?" selected":""}>USD</option><option value="mxn"${v.buyCurrency==="mxn"?" selected":""}>MXN</option></select></label></div><label>Grupo<select class="lot-bucket"><option value="old"${(v.bucket||(state.currentView==="new"?"new":"old"))==="old"?" selected":""}>Cartera anterior</option><option value="new"${(v.bucket||(state.currentView==="new"?"new":"old"))==="new"?" selected":""}>Compra nueva</option></select></label><label>Exchange / Wallet<input class="lot-location" value="${escapeHtml(v.location||"")}" placeholder="Binance, Bitso, Ledger..."></label><div class="grid3"><label>Intención<select class="lot-purpose"><option value="long"${(v.purpose||"long")==="long"?" selected":""}>Largo plazo</option><option value="recovery"${v.purpose==="recovery"?" selected":""}>Recuperación</option><option value="opportunity"${v.purpose==="opportunity"?" selected":""}>Nueva oportunidad</option></select></label><label>Objetivo salida<input class="lot-target" type="number" step="any" min="0" value="${v.targetPrice??""}" placeholder="Opcional"></label><label>Moneda objetivo<select class="lot-target-currency"><option value="usd"${(v.targetCurrency||v.buyCurrency||"usd")==="usd"?" selected":""}>USD</option><option value="mxn"${(v.targetCurrency||v.buyCurrency)==="mxn"?" selected":""}>MXN</option></select></label></div><button type="button" class="danger small remove-row">Eliminar compra</button>`;e.querySelector(".remove-row").addEventListener("click",()=>e.remove());$("lotsEditor").appendChild(e)}
 function addGoalRow(v={}){const e=document.createElement("div");e.className="editor-row goal-edit-row";e.innerHTML=`<div class="grid3"><label>Nombre<input class="goal-label" value="${escapeHtml(v.label||"Meta")}" placeholder="Ej. Venta 1"></label><label>Precio objetivo<input class="goal-price" type="number" step="any" min="0" value="${v.price??""}" placeholder="15"></label><label>Moneda<select class="goal-currency"><option value="usd"${(v.currency||"usd")==="usd"?" selected":""}>USD</option><option value="mxn"${v.currency==="mxn"?" selected":""}>MXN</option></select></label></div><button type="button" class="danger small remove-row">Eliminar meta</button>`;e.querySelector(".remove-row").addEventListener("click",()=>e.remove());$("goalsEditor").appendChild(e)}
 function resetForm(){$("assetForm").reset();$("editIndex").value="";$("coinId").value="";$("selectedCoin").classList.add("hidden");$("selectedCoin").textContent="";$("searchResults").innerHTML="";$("lotsEditor").innerHTML="";$("goalsEditor").innerHTML="";state.selectedCoin=null;$("dialogTitle").textContent="Agregar cripto";addLotRow();addGoalRow()}
 function openAdd(){resetForm();$("assetDialog").showModal();setTimeout(()=>$("coinSearch").focus(),50)}
@@ -401,6 +407,7 @@ $("assetForm").addEventListener("submit",e=>{
         buyPrice:buyPrice!==null&&buyPrice>0?buyPrice:null,
         buyCurrency:r.querySelector(".lot-currency").value,
         location:r.querySelector(".lot-location").value.trim(),
+        bucket:r.querySelector(".lot-bucket").value||"old",
         purpose:r.querySelector(".lot-purpose").value||"long",
         targetPrice:targetPrice!==null&&targetPrice>0?targetPrice:null,
         targetCurrency:r.querySelector(".lot-target-currency").value||"usd"
@@ -467,7 +474,7 @@ $("importInput").addEventListener("change",async e=>{
 });
 
 $("closeLotDialog").addEventListener("click",closeLotDialog);$("cancelLotBtn").addEventListener("click",closeLotDialog);
-$("lotForm").addEventListener("submit",e=>{e.preventDefault();const ai=Number($("lotAssetIndex").value),li=Number($("lotIndex").value),a=state.assets?.[ai];if(!a||!a.lots?.[li])return;const amount=num($("lotEditAmount").value),buyPrice=optionalNum($("lotEditPrice").value);if(amount<=0){alert("La cantidad debe ser mayor que cero.");return}if(buyPrice!==null&&buyPrice<0){alert("El precio de compra no puede ser negativo.");return}a.lots[li]={amount,buyPrice,buyCurrency:$("lotEditCurrency").value,location:$("lotEditLocation").value.trim(),purpose:$("lotEditPurpose").value||"long",targetPrice:num($("lotEditTarget").value),targetCurrency:$("lotEditTargetCurrency").value||"usd"};save();closeLotDialog();render();});
+$("lotForm").addEventListener("submit",e=>{e.preventDefault();const ai=Number($("lotAssetIndex").value),li=Number($("lotIndex").value),a=state.assets?.[ai];if(!a||!a.lots?.[li])return;const amount=num($("lotEditAmount").value),buyPrice=optionalNum($("lotEditPrice").value);if(amount<=0){alert("La cantidad debe ser mayor que cero.");return}if(buyPrice!==null&&buyPrice<0){alert("El precio de compra no puede ser negativo.");return}a.lots[li]={amount,buyPrice,buyCurrency:$("lotEditCurrency").value,location:$("lotEditLocation").value.trim(),bucket:$("lotEditBucket").value||"old",purpose:$("lotEditPurpose").value||"long",targetPrice:num($("lotEditTarget").value),targetCurrency:$("lotEditTargetCurrency").value||"usd"};save();closeLotDialog();render();});
 
 $("closeAvgDialog").addEventListener("click",()=>$("avgDialog").close());
 [$("avgPreset1"),$("avgPreset2"),$("avgPreset3")].forEach(el=>el.addEventListener("input",()=>{setPresetValues([num($("avgPreset1").value),num($("avgPreset2").value),num($("avgPreset3").value)]);renderAverageSimulator()}));
@@ -476,4 +483,17 @@ $("avgCalcTarget").addEventListener("click",calculateTargetAverage);
 $("avgTargetPrice").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();calculateTargetAverage()}});
 $("compareCapitalBtn").addEventListener("click",compareNewCapital);
 
+
+function setView(view){state.currentView=view;$("tabAll").classList.toggle("active",view==="all");$("tabNew").classList.toggle("active",view==="new");$("pageTitle").textContent=view==="new"?"Compras nuevas":"Resumen";render()}
+function applyPrivacy(){document.body.classList.toggle("privacy-hidden",state.privacyHidden);$("privacyBtn").textContent=state.privacyHidden?"🙈":"👁";$("privacyBtn").setAttribute("aria-label",state.privacyHidden?"Mostrar saldos":"Ocultar saldos")}
+async function pinHash(pin){const b=new TextEncoder().encode(pin);const h=await crypto.subtle.digest("SHA-256",b);return [...new Uint8Array(h)].map(x=>x.toString(16).padStart(2,"0")).join("")}
+function pinKey(){return STORAGE_KEY+"_pin_hash"}
+function lockIfNeeded(){if(localStorage.getItem(pinKey())&&!sessionStorage.getItem(STORAGE_KEY+"_unlocked"))$("lockScreen").classList.remove("hidden")}
+$("tabAll").addEventListener("click",()=>setView("all"));$("tabNew").addEventListener("click",()=>setView("new"));
+$("privacyBtn").addEventListener("click",()=>{state.privacyHidden=!state.privacyHidden;localStorage.setItem("mi_portafolio_privacy_hidden",state.privacyHidden?"1":"0");applyPrivacy()});
+$("securityBtn").addEventListener("click",()=>{$("newPin").value="";$("confirmPin").value="";$("securityDialog").showModal()});$("closeSecurity").addEventListener("click",()=>$("securityDialog").close());
+$("savePinBtn").addEventListener("click",async()=>{const a=$("newPin").value,b=$("confirmPin").value;if(!/^\d{4}$/.test(a)){alert("El PIN debe tener exactamente 4 dígitos.");return}if(a!==b){alert("Los PIN no coinciden.");return}localStorage.setItem(pinKey(),await pinHash(a));sessionStorage.setItem(STORAGE_KEY+"_unlocked","1");$("securityDialog").close();alert("PIN activado.")});
+$("disablePinBtn").addEventListener("click",()=>{if(!localStorage.getItem(pinKey())){alert("No hay PIN activo.");return}if(confirm("¿Desactivar el PIN de acceso?")){localStorage.removeItem(pinKey());sessionStorage.removeItem(STORAGE_KEY+"_unlocked");$("securityDialog").close();alert("PIN desactivado.")}});
+async function unlock(){const pin=$("unlockPin").value;if(await pinHash(pin)===localStorage.getItem(pinKey())){sessionStorage.setItem(STORAGE_KEY+"_unlocked","1");$("lockScreen").classList.add("hidden");$("unlockError").textContent="";$("unlockPin").value=""}else $("unlockError").textContent="PIN incorrecto"}
+$("unlockBtn").addEventListener("click",unlock);$("unlockPin").addEventListener("keydown",e=>{if(e.key==="Enter")unlock()});
 load();loadMarketContext();try{state.prices=JSON.parse(localStorage.getItem(STORAGE_KEY+"_prices")||"{}")}catch{}render();fetchPrices();setInterval(fetchPrices,10*60*1000);if("serviceWorker"in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{}));

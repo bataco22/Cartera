@@ -9,19 +9,23 @@
   <meta name="apple-mobile-web-app-title" content="Mi Portafolio" />
   <title>Mi Portafolio Cripto</title>
   <link rel="manifest" href="manifest.webmanifest" />
-  <link rel="stylesheet" href="styles.css?v=1.7.6" />
+  <link rel="stylesheet" href="styles.css?v=1.9" />
 </head>
 <body>
   <header class="topbar">
     <div>
       <p class="eyebrow">MI PORTAFOLIO CRIPTO</p>
-      <h1>Resumen</h1>
+      <h1 id="pageTitle">Resumen</h1>
     </div>
     <div class="top-actions">
+      <button id="privacyBtn" class="icon-btn" aria-label="Ocultar saldos">👁</button>
+      <button id="securityBtn" class="icon-btn" aria-label="Seguridad">🔒</button>
       <button id="backupBtn" class="icon-btn" aria-label="Respaldo">⇩</button>
       <button id="refreshBtn" class="icon-btn" aria-label="Actualizar precios">↻</button>
     </div>
   </header>
+
+  <nav class="portfolio-tabs"><button id="tabAll" class="portfolio-tab active">Inicio</button><button id="tabNew" class="portfolio-tab">Nuevas</button></nav>
 
   <main class="container">
     <section class="hero card">
@@ -164,6 +168,7 @@
         <label>Precio compra<input id="lotEditPrice" type="number" step="any" min="0" placeholder="Opcional"></label>
         <label>Moneda<select id="lotEditCurrency"><option value="usd">USD</option><option value="mxn">MXN</option></select></label>
       </div>
+      <label>Grupo<select id="lotEditBucket"><option value="old">Cartera anterior</option><option value="new">Compra nueva</option></select></label>
       <label>Exchange / Wallet<input id="lotEditLocation" placeholder="Binance, Bitso, Ledger..."></label>
       <div class="grid3">
         <label>Intención<select id="lotEditPurpose"><option value="long">Largo plazo</option><option value="recovery">Recuperación</option><option value="opportunity">Nueva oportunidad</option></select></label>
@@ -237,7 +242,11 @@
     </div>
   </dialog>
 
-  <template id="assetTemplate">
+  <dialog id="securityDialog"><div class="dialog-card"><div class="dialog-head"><div><p class="eyebrow">SEGURIDAD</p><h2>PIN de acceso</h2></div><button type="button" id="closeSecurity" class="icon-btn">×</button></div><p class="muted">Activa un PIN de 4 dígitos para impedir que la cartera se muestre al abrir la app.</p><label>Nuevo PIN<input id="newPin" type="password" inputmode="numeric" maxlength="4" pattern="[0-9]{4}" placeholder="4 dígitos"></label><label>Confirmar PIN<input id="confirmPin" type="password" inputmode="numeric" maxlength="4" pattern="[0-9]{4}" placeholder="Repite el PIN"></label><div class="dialog-actions"><button id="disablePinBtn" type="button" class="danger">Desactivar PIN</button><button id="savePinBtn" type="button" class="primary">Guardar PIN</button></div><p class="tiny">El PIN sirve como bloqueo de privacidad local; no sustituye cifrado bancario.</p></div></dialog>
+
+<div id="lockScreen" class="lock-screen hidden"><div class="lock-card"><p class="eyebrow">MI PORTAFOLIO CRIPTO</p><h2>Portafolio bloqueado</h2><p class="muted">Ingresa tu PIN de 4 dígitos.</p><input id="unlockPin" type="password" inputmode="numeric" maxlength="4" pattern="[0-9]{4}" placeholder="••••" autofocus><button id="unlockBtn" class="primary wide">Entrar</button><p id="unlockError" class="negative tiny"></p></div></div>
+
+<template id="assetTemplate">
     <article class="asset card">
       <button class="asset-summary" type="button" aria-expanded="false">
         <div class="coin-main">
