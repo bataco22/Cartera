@@ -1,3 +1,13 @@
+# Mi Portafolio Cripto v1.7.4 — reparación interna de precios
+
+- Valida que una respuesta HTTP realmente contenga precios antes de aceptarla.
+- CoinGecko ya no puede reemplazar precios válidos por una respuesta vacía.
+- Respaldo por símbolo con Binance y Coinbase.
+- Tres fuentes alternativas para USD/MXN.
+- Mezcla resultados parciales y conserva siempre el último precio válido.
+- Importa respaldos antiguos convirtiendo buyPrice 0 a dato desconocido.
+- Si no hay ningún precio, el total muestra — en lugar de un $0 engañoso.
+
 # Mi Portafolio Cripto v1.7.2 — corrección de guardado incompleto
 
 - Se puede guardar una cripto aunque todavía no tenga precio de compra.

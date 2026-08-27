@@ -29,42 +29,91 @@ function goalState(goal,a){
   return {status:"far",label:"Lejos de meta",distance};
 }
 let pricesRequestInFlight=false;
+function validPriceRecord(x){return x&&((Number.isFinite(Number(x.usd))&&Number(x.usd)>0)||(Number.isFinite(Number(x.mxn))&&Number(x.mxn)>0))}
+function normalizePriceRecord(x,usdMxn){
+  if(!x||typeof x!=="object")return null;
+  let usd=Number(x.usd),mxn=Number(x.mxn),chUsd=Number(x.usd_24h_change),chMxn=Number(x.mxn_24h_change);
+  if(!(usd>0)&&mxn>0&&usdMxn>0)usd=mxn/usdMxn;
+  if(!(mxn>0)&&usd>0&&usdMxn>0)mxn=usd*usdMxn;
+  if(!(usd>0)&&!(mxn>0))return null;
+  return {usd:usd>0?usd:null,mxn:mxn>0?mxn:null,usd_24h_change:Number.isFinite(chUsd)?chUsd:null,mxn_24h_change:Number.isFinite(chMxn)?chMxn:(Number.isFinite(chUsd)?chUsd:null),last_updated_at:Number(x.last_updated_at)||Math.floor(Date.now()/1000)};
+}
+function mergePrices(base,incoming,usdMxn){
+  const out={...(base||{})};
+  Object.entries(incoming||{}).forEach(([id,x])=>{const n=normalizePriceRecord(x,usdMxn);if(n)out[id]={...(out[id]||{}),...n}});
+  return out;
+}
+function countUsefulPrices(prices,ids){return ids.filter(id=>validPriceRecord(prices?.[id])).length}
 async function fetchJson(url,timeoutMs=9000){
   const ctl=new AbortController(); const timer=setTimeout(()=>ctl.abort(),timeoutMs);
-  try{const r=await fetch(url,{signal:ctl.signal,cache:"no-store",headers:{"accept":"application/json"}});if(!r.ok){const e=new Error(`HTTP ${r.status}`);e.status=r.status;throw e}return await r.json()}finally{clearTimeout(timer)}
+  try{const r=await fetch(String(url),{signal:ctl.signal,cache:"no-store"});if(!r.ok){const e=new Error(`HTTP ${r.status}`);e.status=r.status;throw e}const data=await r.json();return data}finally{clearTimeout(timer)}
 }
-async function fetchPricesFallback(ids){
-  // Respaldo independiente de CoinGecko: Binance (USD/USDT) + tipo de cambio USD/MXN.
-  const fxData=await fetchJson("https://open.er-api.com/v6/latest/USD",7000);
-  const usdMxn=Number(fxData?.rates?.MXN); if(!Number.isFinite(usdMxn))throw new Error("FX no disponible");
+async function fetchUsdMxn(){
+  const tries=[
+    async()=>Number((await fetchJson("https://open.er-api.com/v6/latest/USD",6500))?.rates?.MXN),
+    async()=>Number((await fetchJson("https://api.frankfurter.app/latest?from=USD&to=MXN",6500))?.rates?.MXN),
+    async()=>Number((await fetchJson("https://api.coinbase.com/v2/exchange-rates?currency=USD",6500))?.data?.rates?.MXN)
+  ];
+  for(const fn of tries){try{const x=await fn();if(Number.isFinite(x)&&x>0)return x}catch{}}
+  return null;
+}
+async function fetchCoinGeckoPrices(ids){
+  const u=new URL("https://api.coingecko.com/api/v3/simple/price");
+  u.searchParams.set("ids",ids.join(","));u.searchParams.set("vs_currencies","usd,mxn");u.searchParams.set("include_24hr_change","true");u.searchParams.set("include_last_updated_at","true");
+  const d=await fetchJson(u,9000);
+  if(!d||typeof d!=="object"||countUsefulPrices(d,ids)===0)throw new Error("CoinGecko respondió sin precios");
+  return d;
+}
+async function fetchSymbolFallback(missingIds,usdMxn){
   const out={};
-  for(const a of state.assets){
-    if(!a.coinId||out[a.coinId])continue;
-    const sym=String(a.symbol||"").toUpperCase().replace(/[^A-Z0-9]/g,"");
-    if(!sym)continue;
+  const byId=new Map(state.assets.map(a=>[a.coinId,a]));
+  for(const id of missingIds){
+    const a=byId.get(id); if(!a)continue;
+    const sym=String(a.symbol||"").toUpperCase().replace(/[^A-Z0-9]/g,""); if(!sym)continue;
+    let usd=null,ch=null;
     try{
-      const d=await fetchJson(`https://data-api.binance.vision/api/v3/ticker/24hr?symbol=${encodeURIComponent(sym+"USDT")}`,6500);
-      const usd=Number(d.lastPrice), ch=Number(d.priceChangePercent);
-      if(Number.isFinite(usd)&&usd>0)out[a.coinId]={usd,mxn:usd*usdMxn,usd_24h_change:Number.isFinite(ch)?ch:null,mxn_24h_change:Number.isFinite(ch)?ch:null,last_updated_at:Math.floor(Date.now()/1000)};
+      const d=await fetchJson(`https://data-api.binance.vision/api/v3/ticker/24hr?symbol=${encodeURIComponent(sym+"USDT")}`,6000);
+      const p=Number(d?.lastPrice);if(p>0){usd=p;const c=Number(d?.priceChangePercent);ch=Number.isFinite(c)?c:null}
     }catch{}
+    if(!(usd>0)){
+      try{const d=await fetchJson(`https://api.coinbase.com/v2/prices/${encodeURIComponent(sym)}-USD/spot`,6000);const p=Number(d?.data?.amount);if(p>0)usd=p}catch{}
+    }
+    if(usd>0)out[id]={usd,mxn:usdMxn>0?usd*usdMxn:null,usd_24h_change:ch,mxn_24h_change:ch,last_updated_at:Math.floor(Date.now()/1000)};
   }
-  if(!Object.keys(out).length)throw new Error("Respaldo sin precios");
   return out;
 }
 async function fetchPrices(){
   if(!state.assets.length){render();return}
   if(pricesRequestInFlight)return;
   pricesRequestInFlight=true;
-  const ids=[...new Set(state.assets.map(a=>a.coinId).filter(Boolean))];$("refreshBtn").textContent="…";clearError();
+  const ids=[...new Set(state.assets.map(a=>a.coinId).filter(Boolean))];
+  const refresh=$("refreshBtn");if(refresh)refresh.textContent="…";clearError();
+  let cached={};try{cached=JSON.parse(localStorage.getItem(STORAGE_KEY+"_prices")||"{}")||{}}catch{}
+  let merged={...cached,...state.prices};
+  const errors=[];
   try{
-    const u=new URL("https://api.coingecko.com/api/v3/simple/price");u.searchParams.set("ids",ids.join(","));u.searchParams.set("vs_currencies","usd,mxn");u.searchParams.set("include_24hr_change","true");u.searchParams.set("include_last_updated_at","true");
-    try{state.prices=await fetchJson(u,9000)}catch(primaryError){state.prices=await fetchPricesFallback(ids)}
+    let fx=await fetchUsdMxn();
+    try{merged=mergePrices(merged,await fetchCoinGeckoPrices(ids),fx)}catch(e){errors.push("CoinGecko")}
+    let missing=ids.filter(id=>!validPriceRecord(merged[id]));
+    if(missing.length){
+      try{const fb=await fetchSymbolFallback(missing,fx);merged=mergePrices(merged,fb,fx)}catch(e){errors.push("respaldo")}
+    }
+    // Si hay USD pero falta MXN, intenta FX una vez más y completa sin borrar precios válidos.
+    if(!fx)fx=await fetchUsdMxn();
+    if(fx)merged=mergePrices({},merged,fx);
+    const useful=countUsefulPrices(merged,ids);
+    if(useful===0)throw new Error("Ningún proveedor devolvió precios utilizables");
+    state.prices=merged;
     localStorage.setItem(STORAGE_KEY+"_prices",JSON.stringify(state.prices));localStorage.setItem(STORAGE_KEY+"_prices_time",String(Date.now()));
-    $("lastUpdated").textContent="Actualizado "+new Date().toLocaleTimeString("es-MX",{hour:"2-digit",minute:"2-digit"});render();
+    if($("lastUpdated"))$("lastUpdated").textContent="Actualizado "+new Date().toLocaleTimeString("es-MX",{hour:"2-digit",minute:"2-digit"});
+    render();
+    const stillMissing=ids.filter(id=>!validPriceRecord(state.prices[id]));
+    if(stillMissing.length)showError(`Se actualizaron ${useful} de ${ids.length} criptos. Faltan ${stillMissing.length}; toca ↻ para reintentar.`);
   }catch(e){
-    try{state.prices=JSON.parse(localStorage.getItem(STORAGE_KEY+"_prices")||"{}")}catch{}
-    showError(Object.keys(state.prices||{}).length?"No hubo conexión con los proveedores de precios. Se conservan los últimos precios guardados.":"No se pudieron obtener precios en este momento. Toca ↻ para reintentar.");render();
-  }finally{$("refreshBtn").textContent="↻";pricesRequestInFlight=false}
+    state.prices=merged;
+    render();
+    showError(Object.keys(merged||{}).some(id=>validPriceRecord(merged[id]))?"No se pudieron renovar todos los precios. Se conservan los últimos precios válidos.":"No se obtuvo ningún precio válido. La cartera sigue guardada; toca ↻ para reintentar.");
+  }finally{if(refresh)refresh.textContent="↻";pricesRequestInFlight=false}
 }
 function showError(msg){let el=document.querySelector(".error-banner");if(!el){el=document.createElement("div");el.className="error-banner";document.querySelector(".container").prepend(el)}el.textContent=msg}
 function clearError(){document.querySelector(".error-banner")?.remove()}
@@ -84,7 +133,7 @@ function render(){
     const summary=n.querySelector(".asset-summary"),details=n.querySelector(".asset-details"),chevron=n.querySelector(".chevron");summary.addEventListener("click",()=>{const willOpen=details.classList.contains("hidden");document.querySelectorAll("#portfolioList .asset-details").forEach(d=>d.classList.add("hidden"));document.querySelectorAll("#portfolioList .asset-summary").forEach(b=>b.setAttribute("aria-expanded","false"));document.querySelectorAll("#portfolioList .chevron").forEach(c=>c.classList.remove("open"));if(willOpen){details.classList.remove("hidden");summary.setAttribute("aria-expanded","true");chevron.classList.add("open")}});n.querySelector(".avg-sim-btn").addEventListener("click",e=>{e.stopPropagation();openAverageSimulator(index)});n.querySelector(".edit-btn").addEventListener("click",e=>{e.stopPropagation();openEdit(index)});n.querySelector(".delete-btn").addEventListener("click",e=>{e.stopPropagation();if(confirm(`¿Eliminar ${a.name}?`)){state.assets.splice(index,1);save();render();fetchPrices()}});
     list.appendChild(n)
   });
-  const hasIncompleteCost=calc.some(x=>x.t.hasUnknownCost);const totalPnl=!hasIncompleteCost&&totalCost?totalValue-totalCost:NaN,totalPct=!hasIncompleteCost&&totalCost?totalPnl/totalCost*100:NaN;$("totalValue").textContent=fmt(totalValue);$("totalCost").textContent=totalCost?fmt(totalCost):"—";$("totalPnl").textContent=Number.isFinite(totalPnl)?fmt(totalPnl):"—";$("totalPnl").className=pctClass(totalPnl);$("totalPct").textContent=formatPct(totalPct);$("totalPct").className=pctClass(totalPct);
+  const hasIncompleteCost=calc.some(x=>x.t.hasUnknownCost);const totalPnl=!hasIncompleteCost&&totalCost?totalValue-totalCost:NaN,totalPct=!hasIncompleteCost&&totalCost?totalPnl/totalCost*100:NaN;$("totalValue").textContent=calc.some(x=>Number.isFinite(x.t.value))?fmt(totalValue):"—";$("totalCost").textContent=totalCost?fmt(totalCost):"—";$("totalPnl").textContent=Number.isFinite(totalPnl)?fmt(totalPnl):"—";$("totalPnl").className=pctClass(totalPnl);$("totalPct").textContent=formatPct(totalPct);$("totalPct").className=pctClass(totalPct);
   renderGoals(calc);renderAllocation(calc,totalValue)
 }
 
@@ -337,7 +386,26 @@ $("addBtn").addEventListener("click",openAdd);$("emptyAddBtn").addEventListener(
 document.querySelectorAll(".currency").forEach(b=>b.addEventListener("click",()=>{state.displayCurrency=b.dataset.currency;save();render()}));
 $("backupBtn").addEventListener("click",()=>$("backupDialog").showModal());$("closeBackup").addEventListener("click",()=>$("backupDialog").close());
 $("exportBtn").addEventListener("click",()=>{const blob=new Blob([JSON.stringify({version:"1.7",exportedAt:new Date().toISOString(),assets:state.assets,displayCurrency:state.displayCurrency,avgPresets:state.avgPresets},null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`mi-portafolio-cripto-${new Date().toISOString().slice(0,10)}.json`;a.click();URL.revokeObjectURL(a.href)});
-$("importInput").addEventListener("change",async e=>{const f=e.target.files?.[0];if(!f)return;try{const d=JSON.parse(await f.text());if(!Array.isArray(d.assets))throw new Error();if(confirm("Esto reemplazará el portafolio actual. ¿Continuar?")){state.assets=d.assets;state.displayCurrency=d.displayCurrency||"mxn";if(d.avgPresets)state.avgPresets={...state.avgPresets,...d.avgPresets};save();$("backupDialog").close();render();fetchPrices()}}catch{alert("El archivo no parece ser un respaldo válido.")}e.target.value=""});
+$("importInput").addEventListener("change",async e=>{
+  const f=e.target.files?.[0]; if(!f)return;
+  try{
+    const d=JSON.parse(await f.text()); if(!Array.isArray(d.assets))throw new Error();
+    if(confirm("Esto reemplazará el portafolio actual. ¿Continuar?")){
+      state.assets=d.assets.map(a=>({
+        ...a,
+        lots:Array.isArray(a.lots)?a.lots.map(l=>({
+          ...l,
+          buyPrice:Number(l.buyPrice)>0?Number(l.buyPrice):null,
+          targetPrice:Number(l.targetPrice)>0?Number(l.targetPrice):null
+        })):[]
+      }));
+      state.displayCurrency=d.displayCurrency||"mxn";
+      if(d.avgPresets)state.avgPresets={...state.avgPresets,...d.avgPresets};
+      save();$("backupDialog").close();render();fetchPrices();
+    }
+  }catch{alert("El archivo no parece ser un respaldo válido.")}
+  e.target.value="";
+});
 
 $("closeLotDialog").addEventListener("click",closeLotDialog);$("cancelLotBtn").addEventListener("click",closeLotDialog);
 $("lotForm").addEventListener("submit",e=>{e.preventDefault();const ai=Number($("lotAssetIndex").value),li=Number($("lotIndex").value),a=state.assets?.[ai];if(!a||!a.lots?.[li])return;const amount=num($("lotEditAmount").value),buyPrice=optionalNum($("lotEditPrice").value);if(amount<=0){alert("La cantidad debe ser mayor que cero.");return}if(buyPrice!==null&&buyPrice<0){alert("El precio de compra no puede ser negativo.");return}a.lots[li]={amount,buyPrice,buyCurrency:$("lotEditCurrency").value,location:$("lotEditLocation").value.trim(),purpose:$("lotEditPurpose").value||"long",targetPrice:num($("lotEditTarget").value),targetCurrency:$("lotEditTargetCurrency").value||"usd"};save();closeLotDialog();render();});
