@@ -1,3 +1,13 @@
+# Mi Portafolio Cripto v1.7.2 — corrección de guardado incompleto
+
+- Se puede guardar una cripto aunque todavía no tenga precio de compra.
+- También se puede guardar como seguimiento aunque aún no se capture una compra/cantidad.
+- Precio de compra vacío se conserva como dato desconocido, nunca como 0.
+- Los cálculos de costo, promedio y P/L quedan en “—” cuando falta el costo.
+- El guardado se completa antes de cualquier consulta a CoinGecko.
+- Las consultas de contexto de mercado ya no se hacen una por una de forma secuencial.
+- Caché PWA renovada y archivos JS/CSS versionados para evitar que iPhone use la copia anterior.
+
 # Mi Portafolio Cripto v1.6
 
 Novedades:

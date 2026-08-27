@@ -208,10 +208,9 @@ async function fetchMarketContextForAsset(a){
   }
 }
 async function fetchAllMarketContext(){
-  for(const a of state.assets){
-    await fetchMarketContextForAsset(a);
-  }
-  render();
+  const assets=[...state.assets];
+  await Promise.allSettled(assets.map(a=>fetchMarketContextForAsset(a)));
+  try{render()}catch(e){console.error("Error al actualizar contexto de mercado",e)}
 }
 function usdToDisplay(v,a){
   v=Number(v); if(!Number.isFinite(v))return NaN;
@@ -267,7 +266,38 @@ function resetForm(){$("assetForm").reset();$("editIndex").value="";$("coinId").
 function openAdd(){resetForm();$("assetDialog").showModal();setTimeout(()=>$("coinSearch").focus(),50)}
 function openEdit(i){resetForm();const a=state.assets[i];$("editIndex").value=i;$("dialogTitle").textContent="Editar cripto";selectCoin({coinId:a.coinId,name:a.name,symbol:a.symbol});$("lotsEditor").innerHTML="";$("goalsEditor").innerHTML="";(a.lots||[]).forEach(addLotRow);(a.goals||[]).forEach(addGoalRow);if(!(a.lots||[]).length)addLotRow();if(!(a.goals||[]).length)addGoalRow();$("assetDialog").showModal()}
 function closeDialog(){$("assetDialog").close()}
-$("assetForm").addEventListener("submit",e=>{e.preventDefault();if(!$("coinId").value||!state.selectedCoin){alert("Selecciona una cripto.");return}const lots=[...document.querySelectorAll(".lot-row")].map(r=>({amount:num(r.querySelector(".lot-amount").value),buyPrice:optionalNum(r.querySelector(".lot-price").value),buyCurrency:r.querySelector(".lot-currency").value,location:r.querySelector(".lot-location").value.trim(),purpose:r.querySelector(".lot-purpose").value||"long",targetPrice:num(r.querySelector(".lot-target").value),targetCurrency:r.querySelector(".lot-target-currency").value||"usd"})).filter(l=>l.amount>0);if(!lots.length){alert("Agrega al menos una cantidad mayor que cero.");return}const goals=[...document.querySelectorAll(".goal-edit-row")].map(r=>({label:r.querySelector(".goal-label").value.trim()||"Meta",price:num(r.querySelector(".goal-price").value),currency:r.querySelector(".goal-currency").value})).filter(g=>g.price>0);const a={coinId:$("coinId").value,name:state.selectedCoin.name,symbol:state.selectedCoin.symbol.toUpperCase(),lots,goals};const idx=$("editIndex").value;if(idx==="")state.assets.push(a);else state.assets[Number(idx)]=a;save();closeDialog();render();fetchPrices()});
+$("assetForm").addEventListener("submit",e=>{
+  e.preventDefault();
+  if(!$("coinId").value||!state.selectedCoin){alert("Selecciona una cripto.");return}
+  try{
+    const lots=[...document.querySelectorAll(".lot-row")].map(r=>{
+      const amount=optionalNum(r.querySelector(".lot-amount").value);
+      const buyPrice=optionalNum(r.querySelector(".lot-price").value);
+      const targetPrice=optionalNum(r.querySelector(".lot-target").value);
+      return {
+        amount:amount===null?0:Math.max(0,amount),
+        buyPrice:buyPrice!==null&&buyPrice>0?buyPrice:null,
+        buyCurrency:r.querySelector(".lot-currency").value,
+        location:r.querySelector(".lot-location").value.trim(),
+        purpose:r.querySelector(".lot-purpose").value||"long",
+        targetPrice:targetPrice!==null&&targetPrice>0?targetPrice:null,
+        targetCurrency:r.querySelector(".lot-target-currency").value||"usd"
+      };
+    }).filter(l=>l.amount>0);
+    const goals=[...document.querySelectorAll(".goal-edit-row")].map(r=>({label:r.querySelector(".goal-label").value.trim()||"Meta",price:optionalNum(r.querySelector(".goal-price").value),currency:r.querySelector(".goal-currency").value})).filter(g=>g.price!==null&&g.price>0);
+    const a={coinId:$("coinId").value,name:state.selectedCoin.name,symbol:state.selectedCoin.symbol.toUpperCase(),lots,goals};
+    const idx=$("editIndex").value;
+    if(idx==="")state.assets.push(a);else state.assets[Number(idx)]=a;
+    save();
+    closeDialog();
+    render();
+    // Las consultas de red van después del guardado y nunca deben bloquear la interfaz.
+    Promise.resolve().then(()=>fetchPrices()).catch(()=>{});
+  }catch(err){
+    console.error("Error al guardar activo",err);
+    alert("No se pudo guardar esta cripto. Intenta de nuevo; tus datos anteriores siguen intactos.");
+  }
+});
 $("coinSearch").addEventListener("input",e=>{$("coinId").value="";state.selectedCoin=null;$("selectedCoin").classList.add("hidden");clearTimeout(state.searchTimer);state.searchTimer=setTimeout(()=>searchCoins(e.target.value),350)});
 $("addBtn").addEventListener("click",openAdd);$("emptyAddBtn").addEventListener("click",openAdd);$("closeDialog").addEventListener("click",closeDialog);$("cancelBtn").addEventListener("click",closeDialog);$("addLotBtn").addEventListener("click",()=>addLotRow());$("addGoalBtn").addEventListener("click",()=>addGoalRow());$("refreshBtn").addEventListener("click",fetchPrices);
 document.querySelectorAll(".currency").forEach(b=>b.addEventListener("click",()=>{state.displayCurrency=b.dataset.currency;save();render()}));
