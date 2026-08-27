@@ -90,3 +90,7 @@ Los datos dependen de disponibilidad y límites de la API pública.
 
 ## v1.7.6 - Reset total
 Se añadió un botón **Reset total** dentro de Respaldo. Borra únicamente los datos locales de esta app (cartera, compras, metas, precios guardados y contexto/caché de mercado), con doble confirmación y limpieza de la caché PWA.
+
+
+## v1.7.7
+Los activos con compras sin precio de compra se muestran primero y se marcan con “Falta precio de compra”, conservando edición normal.

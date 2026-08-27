@@ -152,9 +152,17 @@ function render(){
   document.querySelectorAll(".currency").forEach(b=>b.classList.toggle("active",b.dataset.currency===state.displayCurrency));
   $("coinCount").textContent=`${state.assets.length} ${state.assets.length===1?"activo":"activos"}`;$("emptyState").classList.toggle("hidden",state.assets.length>0);$("portfolioList").classList.toggle("hidden",state.assets.length===0);
   const list=$("portfolioList");list.innerHTML="";let totalValue=0,totalCost=0;
-  const calc=state.assets.map(a=>({a,t:totalsFor(a)}));calc.forEach(x=>{if(Number.isFinite(x.t.value))totalValue+=x.t.value;if(Number.isFinite(x.t.cost)&&x.t.cost>0)totalCost+=x.t.cost});
-  calc.forEach(({a,t},index)=>{
+  const calc=state.assets.map((a,assetIndex)=>({a,t:totalsFor(a),assetIndex}));
+  calc.forEach(x=>{if(Number.isFinite(x.t.value))totalValue+=x.t.value;if(Number.isFinite(x.t.cost)&&x.t.cost>0)totalCost+=x.t.cost});
+  // Los activos con datos incompletos van primero para que nunca queden "ocultos" al final.
+  const displayCalc=[...calc].sort((x,y)=>Number(y.t.hasUnknownCost)-Number(x.t.hasUnknownCost));
+  displayCalc.forEach(({a,t,assetIndex})=>{
+    const index=assetIndex;
     const n=$("assetTemplate").content.cloneNode(true);n.querySelector(".coin-avatar").textContent=(a.symbol||"?").slice(0,1).toUpperCase();n.querySelector(".coin-name").textContent=a.name;n.querySelector(".symbol").textContent=a.symbol;n.querySelector(".amount-text").textContent=`${t.amount} ${a.symbol}`;n.querySelector(".current-price").textContent=fmt(t.price);n.querySelector(".asset-value").textContent=fmt(t.value);n.querySelector(".summary-price").textContent=fmt(t.price);n.querySelector(".summary-value").textContent=Number.isFinite(t.value)?`Valor ${fmt(t.value)}`:"Valor —";n.querySelector(".avg-price").textContent=Number.isFinite(t.avg)?fmt(t.avg):(t.hasUnknownCost?"Sin precio de compra":"Sin compras");
+    if(t.hasUnknownCost){
+      const meta=n.querySelector(".coin-meta");
+      const warn=document.createElement("span");warn.className="incomplete-badge";warn.textContent="Falta precio de compra";meta.appendChild(warn);
+    }
     const ch=state.prices?.[a.coinId]?.[`${state.displayCurrency}_24h_change`],chEl=n.querySelector(".change24");chEl.textContent=Number.isFinite(ch)?`${formatPct(ch)} en 24 h`:"Cambio 24 h —";chEl.classList.add(pctClass(ch));
     const pe=n.querySelector(".asset-pnl");pe.textContent=Number.isFinite(t.pnl)?`${fmt(t.pnl)} · ${formatPct(t.pnlPct)}`:"Sin costo";pe.classList.add(pctClass(t.pnl));
     populateMarketContext(n,a,t);const loc=n.querySelector(".locations-row");renderLocationGroups(loc,a,index);
